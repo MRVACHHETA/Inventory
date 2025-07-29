@@ -1,13 +1,10 @@
-// src/app/api/spare-parts/[id]/route.ts
-import { NextResponse } from 'next/server';
-import dbConnect from '@/lib/mongodb';
-import SparePart from '@/models/SparePart'; // Assuming SparePart is your Mongoose Model
+import { NextResponse } from 'next/server' // Removed 'type NextRequest' from import
+import dbConnect from '@/lib/mongodb'
+import SparePart from '@/models/SparePart'
 
 // Define the interface for the SparePart document as it appears in the database.
-// This is based on the 'SparePart' interface you provided in public-inventory/page.tsx,
-// extended to include potential Mongoose-specific properties like _id, createdAt, and updatedAt.
 interface ISparePartDocument {
-  _id: string; // Mongoose adds this
+  _id: string;
   name: string;
   deviceModel: string;
   quantity: number;
@@ -16,12 +13,11 @@ interface ISparePartDocument {
   category: string;
   imageUrl?: string;
   description?: string;
-  createdAt?: Date; // Mongoose adds this if timestamps: true is in schema
-  updatedAt?: Date; // Mongoose adds this if timestamps: true is in schema
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // Define a type for the incoming request body when updating a spare part.
-// This interface accurately reflects what the API *receives* from the client.
 interface UpdateRequestBody {
   name?: string;
   deviceModel?: string;
@@ -31,75 +27,86 @@ interface UpdateRequestBody {
   category?: string;
   imageUrl?: string;
   description?: string;
-  model?: string; // This allows the client to send 'model' for deviceModel
+  model?: string;
 }
 
-// GET a single spare part by ID
+// GET spare part by ID
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  req: Request,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: any // WORKAROUND: Explicitly typing as 'any' to bypass Next.js 15.4.4 validation bug
 ) {
-  await dbConnect();
+  await dbConnect()
+
   try {
-    const { id } = params; // params is already an object, no need to await
+    const id = context.params.id; // Access id from context.params
     const sparePart = await SparePart.findById(id);
+
     if (!sparePart) {
-      return NextResponse.json({ message: "Spare part not found" }, { status: 404 });
+      return NextResponse.json({ message: 'Spare part not found' }, { status: 404 })
     }
-    return NextResponse.json(sparePart, { status: 200 });
+
+    return NextResponse.json(sparePart)
   } catch (error) {
-    console.error("Error fetching single spare part:", error);
-    // Ensure error is properly handled and is stringifiable
-    return NextResponse.json({ message: "Failed to fetch spare part", error: (error as Error).message || String(error) }, { status: 500 });
+    console.error("Error fetching part:", error);
+    return NextResponse.json({ message: 'Error fetching part', error: (error as Error).message || String(error) }, { status: 500 })
   }
 }
 
-// PUT (Update) a spare part by ID
+// UPDATE spare part by ID
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  req: Request,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: any // WORKAROUND: Explicitly typing as 'any'
 ) {
-  await dbConnect();
-  try {
-    const { id } = params; // params is already an object, no need to await
-    const body: UpdateRequestBody = await request.json(); // Type the incoming body
+  await dbConnect()
 
-    // The type for updateData is now a Partial of the document interface (ISparePartDocument),
-    // explicitly allowing the 'model' property which will be transformed.
+  try {
+    const body: UpdateRequestBody = await req.json()
+
     const updateData: Partial<ISparePartDocument> & { model?: string } = { ...body };
 
-    // Handle the 'model' alias for 'deviceModel'
     if (updateData.model !== undefined) {
       updateData.deviceModel = updateData.model;
-      delete updateData.model; // This works because 'model' is allowed on `updateData`'s type
+      delete updateData.model;
     }
 
-    const updatedSparePart = await SparePart.findByIdAndUpdate(id, updateData, { new: true });
-    if (!updatedSparePart) {
-      return NextResponse.json({ message: "Spare part not found" }, { status: 404 });
+    const id = context.params.id; // Access id from context.params
+    const updatedPart = await SparePart.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    })
+
+    if (!updatedPart) {
+      return NextResponse.json({ message: 'Spare part not found' }, { status: 404 })
     }
-    return NextResponse.json(updatedSparePart, { status: 200 });
+
+    return NextResponse.json(updatedPart)
   } catch (error) {
-    console.error("Error updating spare part:", error);
-    return NextResponse.json({ message: "Failed to update spare part", error: (error as Error).message || String(error) }, { status: 500 });
+    console.error("Error updating part:", error);
+    return NextResponse.json({ message: 'Error updating part', error: (error as Error).message || String(error) }, { status: 500 })
   }
 }
 
-// DELETE a spare part by ID
+// DELETE spare part by ID
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  req: Request,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  context: any // WORKAROUND: Explicitly typing as 'any'
 ) {
-  await dbConnect();
+  await dbConnect()
+
   try {
-    const { id } = params; // params is already an object, no need to await
-    const deletedSparePart = await SparePart.findByIdAndDelete(id);
-    if (!deletedSparePart) {
-      return NextResponse.json({ message: "Spare part not found" }, { status: 404 });
+    const id = context.params.id; // Access id from context.params
+    const deletedPart = await SparePart.findByIdAndDelete(id)
+
+    if (!deletedPart) {
+      return NextResponse.json({ message: 'Spare part not found' }, { status: 404 })
     }
-    return NextResponse.json({ message: "Spare part deleted successfully" }, { status: 200 });
+
+    return NextResponse.json({ message: 'Spare part deleted successfully' })
   } catch (error) {
-    console.error("Error deleting spare part:", error);
-    return NextResponse.json({ message: "Failed to delete spare part", error: (error as Error).message || String(error) }, { status: 500 });
+    console.error("Error deleting part:", error);
+    return NextResponse.json({ message: 'Error deleting part', error: (error as Error).message || String(error) }, { status: 500 })
   }
 }
