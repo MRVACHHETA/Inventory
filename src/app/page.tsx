@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
   Smartphone, HardDrive, BatteryCharging, Camera, Usb, CircuitBoard,
-  Volume2, Mic, Fingerprint, Lightbulb, Box, Wrench, Antenna,
-  DoorOpen, KeyRound, Touchpad, Replace, Factory, Package
+  Volume2, Mic, Fingerprint, Lightbulb, Wrench, Antenna, // Removed Box and Replace
+  DoorOpen, KeyRound, Touchpad, Factory, Package
 } from "lucide-react";
 
 // Define your specific spare part categories with icons
@@ -87,7 +87,8 @@ export default function HomePage() {
       {/* Categories Grid */}
       {filteredCategories.length === 0 ? (
         <div className="text-center text-gray-500 p-10 border rounded-lg bg-white shadow-sm w-full max-w-5xl">
-          <p className="text-lg mb-2">No categories found matching "{categorySearch}".</p>
+          {/* Fixed unescaped entities on line 90 */}
+          <p className="text-lg mb-2">No categories found matching &quot;{categorySearch}&quot;.</p>
           <p className="text-sm">Try a different search term.</p>
         </div>
       ) : (

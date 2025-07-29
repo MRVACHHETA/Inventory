@@ -320,7 +320,7 @@ export default function PublicInventoryPage() {
           </Select>
 
           <Button
-            onClick={handleAddModalOpen}
+            onClick={handleAddModalOpen} // FIX: Changed to call the new handler
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2 shadow-md transition-all duration-200 flex items-center gap-2 group transform active:scale-95 w-full sm:w-auto"
             disabled={actionLoading === "add"}
           >
@@ -344,7 +344,7 @@ export default function PublicInventoryPage() {
             {(search || selectedCategoryFilter !== "All" || selectedStatusFilter !== "All") && (
               <p className="text-sm">Try adjusting your search or filters.</p>
             )}
-            <Button onClick={handleAddModalOpen} className="mt-4 bg-blue-500 hover:bg-blue-600">
+            <Button onClick={handleAddModalOpen} className="mt-4 bg-blue-500 hover:bg-blue-600"> {/* FIX: Changed to call the new handler */}
               Add the first part
             </Button>
           </div>
@@ -395,12 +395,12 @@ export default function PublicInventoryPage() {
                         {part.status === "in-stock" ? "In Stock" : "Out of Stock"}
                       </span>
                     </td>
-                    <td className="p-2 whitespace-nowrap">
-                      <div className="flex flex-col sm:flex-row gap-2"> {/* Responsive button container */}
+                    <td className="p-2 whitespace-nowrap space-x-1">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <Button
                           size="sm"
                           onClick={() => openEditModal(part)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto" // Added w-full
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto"
                           disabled={actionLoading === part._id}
                         >
                           {actionLoading === part._id ? (
@@ -413,7 +413,7 @@ export default function PublicInventoryPage() {
                         <Button
                           size="sm"
                           onClick={() => deletePart(part._id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto" // Added w-full
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto"
                           disabled={actionLoading === part._id}
                         >
                           {actionLoading === part._id ? (
@@ -426,7 +426,7 @@ export default function PublicInventoryPage() {
                         <Button
                           size="sm"
                           onClick={() => toggleStock(part._id, part.status)}
-                          className={`px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto ${ // Added w-full
+                          className={`px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto ${
                             part.status === "in-stock"
                               ? "bg-yellow-500 hover:bg-yellow-600 text-white"
                               : "bg-green-500 hover:bg-green-600 text-white"
@@ -496,15 +496,14 @@ export default function PublicInventoryPage() {
               <Label htmlFor="addDescription" className="text-sm font-medium text-gray-700">Description</Label>
               <Textarea id="addDescription" name="description" rows={3} onChange={handleInputChange} value={newPart.description} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
             </div>
-            {/* IMPROVEMENT: Changed button layout for mobile */}
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-              <Button type="button" variant="outline" disabled className="flex items-center gap-1 w-full sm:w-auto"> {/* Added w-full */}
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" disabled className="flex items-center gap-1">
                 <ImagePlus size={16} /> Upload
               </Button>
-              <Button type="button" variant="outline" disabled className="flex items-center gap-1 w-full sm:w-auto"> {/* Added w-full */}
+              <Button type="button" variant="outline" disabled className="flex items-center gap-1">
                 <Wand2 size={16} /> Generate Image
               </Button>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1 justify-center w-full sm:w-auto" disabled={actionLoading === "add"}> {/* Added w-full & justify-center */}
+              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1" disabled={actionLoading === "add"}>
                 {actionLoading === "add" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -602,8 +601,7 @@ export default function PublicInventoryPage() {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
-              {/* IMPROVEMENT: Added w-full to the single button for better mobile usability */}
-              <Button type="submit" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1 justify-center" disabled={actionLoading === selectedPart._id}>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1" disabled={actionLoading === selectedPart._id}>
                 {actionLoading === selectedPart._id ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
