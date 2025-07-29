@@ -3,23 +3,25 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import SparePart from '@/models/SparePart'; // Assuming SparePart is your Mongoose Model
 
-// You might have an interface like this defining your SparePart document structure
-// For example:
-// interface ISparePart {
-//   name: string;
-//   deviceModel: string;
-//   quantity: number;
-//   price: number;
-//   status: "in-stock" | "out-of-stock";
-//   category: string;
-//   imageUrl?: string;
-//   description?: string;
-//   createdAt: Date;
-//   updatedAt: Date;
-// }
+// Define the interface for the SparePart document as it appears in the database.
+// This is based on the 'SparePart' interface you provided in public-inventory/page.tsx,
+// extended to include potential Mongoose-specific properties like _id, createdAt, and updatedAt.
+interface ISparePartDocument {
+  _id: string; // Mongoose adds this
+  name: string;
+  deviceModel: string;
+  quantity: number;
+  price: number;
+  status: "in-stock" | "out-of-stock";
+  category: string;
+  imageUrl?: string;
+  description?: string;
+  createdAt?: Date; // Mongoose adds this if timestamps: true is in schema
+  updatedAt?: Date; // Mongoose adds this if timestamps: true is in schema
+}
 
 // Define a type for the incoming request body when updating a spare part.
-// This interface accurately reflects what the API *receives*.
+// This interface accurately reflects what the API *receives* from the client.
 interface UpdateRequestBody {
   name?: string;
   deviceModel?: string;
@@ -29,7 +31,7 @@ interface UpdateRequestBody {
   category?: string;
   imageUrl?: string;
   description?: string;
-  model?: string; // This allows the client to send 'model'
+  model?: string; // This allows the client to send 'model' for deviceModel
 }
 
 // GET a single spare part by ID
@@ -62,16 +64,14 @@ export async function PUT(
     const { id } = params; // params is already an object, no need to await
     const body: UpdateRequestBody = await request.json(); // Type the incoming body
 
-    // Create an update object that is flexible enough for our manipulations
-    // We use Record<string, any> for the intermediate manipulation because
-    // TypeScript doesn't easily allow dynamic property addition/deletion
-    // on strictly typed objects without explicit casting or broader types.
-    const updateData: Record<string, any> = { ...body };
+    // The type for updateData is now a Partial of the document interface (ISparePartDocument),
+    // explicitly allowing the 'model' property which will be transformed.
+    const updateData: Partial<ISparePartDocument> & { model?: string } = { ...body };
 
     // Handle the 'model' alias for 'deviceModel'
     if (updateData.model !== undefined) {
       updateData.deviceModel = updateData.model;
-      delete updateData.model; // Now this will work because updateData is Record<string, any>
+      delete updateData.model; // This works because 'model' is allowed on `updateData`'s type
     }
 
     const updatedSparePart = await SparePart.findByIdAndUpdate(id, updateData, { new: true });
