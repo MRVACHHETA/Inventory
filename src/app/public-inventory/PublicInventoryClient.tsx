@@ -1,4 +1,3 @@
-// src/app/public-inventory/PublicInventoryClient.tsx
 'use client'; // This component will ONLY run on the client after initial server render
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -42,7 +41,11 @@ interface SparePart {
   category: string;
   imageUrl?: string;
   description?: string;
+  isLowStock?: boolean; // Added for low stock alert
 }
+
+// Define your low stock threshold here
+const LOW_STOCK_THRESHOLD = 5;
 
 // Renamed to PublicInventoryClient
 export default function PublicInventoryClient() {
@@ -57,7 +60,7 @@ export default function PublicInventoryClient() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
-  const [newPart, setNewPart] = useState<Omit<SparePart, "_id" | "status">>({
+  const [newPart, setNewPart] = useState<Omit<SparePart, "_id" | "status" | "isLowStock">>({ // Updated Omit
     name: "",
     deviceModel: "",
     quantity: 0,
@@ -68,31 +71,39 @@ export default function PublicInventoryClient() {
   });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false); // New state for low stock filter
 
   const fetchParts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/spare-parts");
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
       const data: SparePart[] = await res.json();
       const processedData = data.map((part) => ({
         ...part,
         price: parseFloat(part.price as unknown as string) || 0,
         quantity: parseInt(part.quantity as unknown as string) || 0,
+        // Calculate isLowStock here
+        isLowStock: part.quantity <= LOW_STOCK_THRESHOLD && part.status === 'in-stock'
       }));
       setParts(processedData);
     } catch (error) {
       console.error("Failed to fetch spare parts:", error);
+      // Removed the 'setError' state as it wasn't defined.
+      // If you want to show an error message, add a state for it.
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Depend on nothing if initialCategory is only used on mount
 
   useEffect(() => {
     fetchParts();
     if (initialCategory) {
         setSelectedCategoryFilter(initialCategory);
     }
-  }, [fetchParts, initialCategory]);
+  }, [fetchParts, initialCategory]); // Add initialCategory to dependencies
 
   const deletePart = async (id: string) => {
     if (!confirm("Are you sure to delete this part?")) return;
@@ -123,7 +134,17 @@ export default function PublicInventoryClient() {
       });
       if (res.ok) {
         setParts((prev) =>
-          prev.map((p) => (p._id === id ? { ...p, status: newStatus as "in-stock" | "out-of-stock" } : p))
+          prev.map((p) => {
+            if (p._id === id) {
+              const updatedPart = { ...p, status: newStatus as "in-stock" | "out-of-stock" };
+              // Recalculate isLowStock when status changes
+              return {
+                ...updatedPart,
+                isLowStock: updatedPart.quantity <= LOW_STOCK_THRESHOLD && updatedPart.status === 'in-stock'
+              };
+            }
+            return p;
+          })
         );
       } else {
         const error = await res.text();
@@ -181,6 +202,7 @@ export default function PublicInventoryClient() {
           ...saved,
           price: parseFloat(saved.price as unknown as string) || 0,
           quantity: parseInt(saved.quantity as unknown as string) || 0,
+          isLowStock: saved.quantity <= LOW_STOCK_THRESHOLD && saved.status === 'in-stock', // Calculate here
         },
       ]);
       setAddModalOpen(false);
@@ -215,7 +237,7 @@ export default function PublicInventoryClient() {
     if (!selectedPart) return;
 
     setActionLoading(selectedPart._id);
-    const { _id, ...cleaned } = selectedPart;
+    const { _id, isLowStock, ...cleaned } = selectedPart; // Destructure isLowStock to not send to API
 
     try {
       const res = await fetch(`/api/spare-parts/${_id}`, {
@@ -237,6 +259,7 @@ export default function PublicInventoryClient() {
                 ...updated,
                 price: parseFloat(updated.price as unknown as string) || 0,
                 quantity: parseInt(updated.quantity as unknown as string) || 0,
+                isLowStock: updated.quantity <= LOW_STOCK_THRESHOLD && updated.status === 'in-stock', // Recalculate
               }
             : p
         )
@@ -251,7 +274,7 @@ export default function PublicInventoryClient() {
   };
 
   const filteredParts = useMemo(() => {
-    return parts.filter(
+    let currentParts = parts.filter(
       (part) => {
         const matchesSearch =
           part?.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -267,7 +290,14 @@ export default function PublicInventoryClient() {
         return matchesSearch && matchesCategory && matchesStatus;
       }
     );
-  }, [parts, search, selectedCategoryFilter, selectedStatusFilter]);
+
+    // Apply low stock filter
+    if (showLowStockOnly) {
+      currentParts = currentParts.filter(part => part.isLowStock);
+    }
+
+    return currentParts;
+  }, [parts, search, selectedCategoryFilter, selectedStatusFilter, showLowStockOnly]);
 
 
   return (
@@ -316,6 +346,20 @@ export default function PublicInventoryClient() {
             </SelectContent>
           </Select>
 
+          {/* New checkbox for Low Stock Filter */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="lowStockFilter"
+              checked={showLowStockOnly}
+              onChange={(e) => setShowLowStockOnly(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="lowStockFilter" className="text-sm font-medium text-gray-700">
+              Show Low Stock Only
+            </label>
+          </div>
+
           <Button
             onClick={handleAddModalOpen}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2 shadow-md transition-all duration-200 flex items-center gap-2 group transform active:scale-95 w-full sm:w-auto"
@@ -338,7 +382,7 @@ export default function PublicInventoryClient() {
         ) : filteredParts.length === 0 ? (
           <div className="text-center text-gray-500 p-10 border rounded-lg bg-white shadow-sm">
             <p className="text-lg mb-2">No spare parts found.</p>
-            {(search || selectedCategoryFilter !== "All" || selectedStatusFilter !== "All") && (
+            {(search || selectedCategoryFilter !== "All" || selectedStatusFilter !== "All" || showLowStockOnly) && ( // Updated for low stock filter
               <p className="text-sm">Try adjusting your search or filters.</p>
             )}
             <Button onClick={handleAddModalOpen} className="mt-4 bg-blue-500 hover:bg-blue-600">
@@ -379,7 +423,17 @@ export default function PublicInventoryClient() {
                     <td className="p-4 whitespace-nowrap font-medium text-gray-900">{part.name}</td>
                     <td className="p-4 whitespace-nowrap text-gray-700">{part.deviceModel}</td>
                     <td className="p-4 whitespace-nowrap text-gray-700">{part.category}</td>
-                    <td className="p-4 whitespace-nowrap text-gray-700">{part.quantity}</td>
+                    <td className="p-4 whitespace-nowrap text-gray-700">
+                      {/* Conditionally apply style or add an alert indicator */}
+                      <span className={`${part.isLowStock ? 'font-bold text-red-600' : ''}`}>
+                        {part.quantity}
+                      </span>
+                      {part.isLowStock && (
+                        <span className="ml-2 text-red-500 text-xs font-semibold">
+                          (Low Stock!)
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 whitespace-nowrap text-gray-700">₹{part.price.toFixed(2)}</td>
                     <td className="p-4 whitespace-nowrap">
                       <span
@@ -449,11 +503,12 @@ export default function PublicInventoryClient() {
 
       {/* Add Part Modal */}
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
-        <DialogContent className="sm:max-w-[425px] p-6 rounded-lg shadow-xl">
+        <DialogContent className="max-w-[90%] w-full sm:max-w-[425px] md:max-w-[500px] lg:max-w-[600px] p-6 rounded-lg shadow-xl mx-auto my-8 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-blue-700">Add New Spare Part</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddSubmit} className="space-y-4 pt-4">
+            {/* Each div containing Label and Input/Select */}
             <div>
               <Label htmlFor="addName" className="text-sm font-medium text-gray-700">Name</Label>
               <Input id="addName" name="name" required onChange={handleInputChange} value={newPart.name} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
@@ -493,14 +548,14 @@ export default function PublicInventoryClient() {
               <Label htmlFor="addDescription" className="text-sm font-medium text-gray-700">Description</Label>
               <Textarea id="addDescription" name="description" rows={3} onChange={handleInputChange} value={newPart.description} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
             </div>
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" disabled className="flex items-center gap-1">
+            <div className="flex flex-col sm:flex-row gap-2 justify-end"> {/* Added flex-col for mobile */}
+              <Button type="button" variant="outline" disabled className="flex items-center gap-1 w-full sm:w-auto"> {/* Added w-full for mobile */}
                 <ImagePlus size={16} /> Upload
               </Button>
-              <Button type="button" variant="outline" disabled className="flex items-center gap-1">
+              <Button type="button" variant="outline" disabled className="flex items-center gap-1 w-full sm:w-auto"> {/* Added w-full for mobile */}
                 <Wand2 size={16} /> Generate Image
               </Button>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1" disabled={actionLoading === "add"}>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1 w-full sm:w-auto" disabled={actionLoading === "add"}> {/* Added w-full for mobile */}
                 {actionLoading === "add" ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -514,7 +569,7 @@ export default function PublicInventoryClient() {
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="sm:max-w-[425px] p-6 rounded-lg shadow-xl">
+        <DialogContent className="max-w-[90%] w-full sm:max-w-[425px] md:max-w-[500px] lg:max-w-[600px] p-6 rounded-lg shadow-xl mx-auto my-8 max-h-[90vh] overflow-y-auto"> {/* Applied same DialogContent classes here */}
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-blue-700">Edit Spare Part</DialogTitle>
           </DialogHeader>
