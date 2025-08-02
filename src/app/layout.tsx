@@ -5,8 +5,10 @@ import "./globals.css";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, ReceiptText } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Toaster } from "@/components/ui/sonner"; // Your Toaster component from sonner
+import { Button } from "@/components/ui/button";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState<string | null>(null);
@@ -38,27 +40,34 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        {/* Manually added title and description to resolve "use client" metadata error */}
         <title>Inventory System</title>
         <meta name="description" content="Manage your inventory seamlessly" />
-
-        {/* Using Satoshi font as in your previous project */}
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
-        {/* Assuming you might want PWA features later, keeping manifest/icons */}
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/icons/icon-192x192.png" />
         <meta name="theme-color" content="#ffffff" />
       </head>
       <body className="antialiased bg-white text-gray-900 font-satoshi">
         <header className="sticky top-0 z-50 bg-white/60 backdrop-blur-md shadow-sm border-b border-gray-200">
-          <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3"> {/* Adjusted px */}
+          <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/inventory-logo.png" alt="Inventory Logo" width={60} height={60} className="rounded-xl" />
-              <span className="text-xl sm:text-2xl font-bold text-blue-700 tracking-tight whitespace-nowrap">Inventory System</span> {/* Adjusted font size */}
+              <span className="text-xl sm:text-2xl font-bold text-blue-700 tracking-tight whitespace-nowrap">Inventory System</span>
             </Link>
 
             <nav className="hidden sm:flex items-center gap-4 text-sm font-medium text-gray-700">
               <Link href="/" className="hover:text-blue-600">Home</Link>
+
+              {/* CORRECTED: Billing Button for desktop navigation */}
+              <Button asChild variant="default" size="sm" className="ml-2 px-4">
+                <Link href="/billing">
+                  {/* Wrap content in a single div */}
+                  <div className="flex items-center gap-2">
+                    <ReceiptText className="h-4 w-4" />
+                    <span>Billing</span>
+                  </div>
+                </Link>
+              </Button>
 
               {!loading && (
                 userName ? (
@@ -84,8 +93,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-64 bg-white text-gray-900 border-l shadow-xl">
-                  <div className="mt-14 flex flex-col gap-4 px-4"> {/* Adjusted px */}
+                  <div className="mt-14 flex flex-col gap-4 px-4">
                     <Link href="/" className="py-2 border-b hover:text-blue-600">Home</Link>
+                    {/* CORRECTED: Billing Button for mobile navigation */}
+                    <Button asChild variant="default" className="justify-start px-0 py-2 w-full text-base">
+                        <Link href="/billing">
+                            {/* Wrap content in a single div */}
+                            <div className="flex items-center gap-2 ml-4">
+                                <ReceiptText className="h-5 w-5" />
+                                <span>Billing</span>
+                            </div>
+                        </Link>
+                    </Button>
 
                     {!loading && (
                       userName ? (
@@ -111,6 +130,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="min-h-screen pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {children}
         </main>
+        {/* UPDATED TOASTER COMPONENT */}
+        <Toaster
+          position="bottom-right" // Position of the toast (e.g., "bottom-right", "top-center")
+          richColors             // Use a richer color palette for success/error toasts
+          duration={5000}        // Duration in milliseconds (5000ms = 5 seconds). Adjust as needed.
+          closeButton            // Adds a small 'x' button to close the toast manually
+          theme="light"          // Explicitly set theme to 'light' (or 'dark', or 'system').
+                                 // If 'light' is still unclear, try 'dark'.
+          toastOptions={{       // Custom styling for the toasts themselves
+            style: {
+              background: 'white', // Ensure a solid white background
+              color: 'black',      // Ensure black text color for contrast
+              border: '1px solid #e2e8f0', // Add a subtle border
+              padding: '12px 16px', // Adjust padding for more space
+              minHeight: '48px',   // Ensure minimum height to prevent text cutoff
+            },
+            // You can add className here for Tailwind classes if needed
+            // className: 'text-sm font-medium',
+          }}
+        />
       </body>
     </html>
   );

@@ -1,19 +1,10 @@
-'use client'; // This component will ONLY run on the client after initial server render
+'use client';
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useSearchParams } from "next/navigation"; // This hook is now safely within a client component
+import { useSearchParams } from "next/navigation";
+import Image from "next/image"; // ADDED this import for image optimization
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Pencil, Trash, ImagePlus, Wand2, Search, RefreshCcw, Loader2, PlusCircle } from "lucide-react";
-import Image from 'next/image';
 import {
   Select,
   SelectContent,
@@ -21,7 +12,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/app/components/badge";
+import { SparePartForm } from "@/app/components/SparePartForm";
 
+import {
+  Search, Loader2, PlusCircle, Pencil, Trash2, Tag, Layers, MoreVertical
+} from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const CATEGORIES = [
   "Combos", "Frames", "Back Panels", "LCDs", "Batteries", "Cameras",
@@ -31,23 +34,26 @@ const CATEGORIES = [
   "On/Off Switches", "Outer Keys", "Touch Glass", "Full Body"
 ];
 
+const INITIAL_COMMON_BRANDS = [
+  "Vivo", "Oppo", "Samsung", "Realme", "Infinix", "Tecno", "Redmi", "Poco", "OnePlus", "Apple", "Google Pixel"
+];
+
 interface SparePart {
   _id: string;
-  name: string;
-  deviceModel: string;
+  deviceModel: string[];
+  brand: string[];
   quantity: number;
   price: number;
   status: "in-stock" | "out-of-stock";
   category: string;
   imageUrl?: string;
   description?: string;
-  isLowStock?: boolean; // Added for low stock alert
+  isLowStock?: boolean;
+  boxNumber?: string;
 }
 
-// Define your low stock threshold here
 const LOW_STOCK_THRESHOLD = 5;
 
-// Renamed to PublicInventoryClient
 export default function PublicInventoryClient() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category");
@@ -60,18 +66,21 @@ export default function PublicInventoryClient() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
-  const [newPart, setNewPart] = useState<Omit<SparePart, "_id" | "status" | "isLowStock">>({ // Updated Omit
-    name: "",
-    deviceModel: "",
-    quantity: 0,
-    price: 0,
-    imageUrl: "",
-    description: "",
-    category: CATEGORIES[0] || "",
-  });
+
+  const [allBrands, setAllBrands] = useState<string[]>(INITIAL_COMMON_BRANDS);
+
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showLowStockOnly, setShowLowStockOnly] = useState(false); // New state for low stock filter
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+
+  const [addFormInitialData, setAddFormInitialData] = useState<Omit<SparePart, "_id" | "status" | "isLowStock"> | null>(null);
+
+  const handleAddBrandToAll = useCallback((newBrand: string) => {
+    setAllBrands(prev => {
+      const updatedBrands = Array.from(new Set([...prev, newBrand]));
+      return updatedBrands.sort();
+    });
+  }, []);
 
   const fetchParts = useCallback(async () => {
     setLoading(true);
@@ -85,25 +94,33 @@ export default function PublicInventoryClient() {
         ...part,
         price: parseFloat(part.price as unknown as string) || 0,
         quantity: parseInt(part.quantity as unknown as string) || 0,
-        // Calculate isLowStock here
+        deviceModel: Array.isArray(part.deviceModel) ? part.deviceModel : (part.deviceModel ? [part.deviceModel] : []),
+        brand: Array.isArray(part.brand) ? part.brand : (part.brand ? [part.brand] : []),
+        status: part.status || (part.quantity > 0 ? "in-stock" : "out-of-stock"),
         isLowStock: part.quantity <= LOW_STOCK_THRESHOLD && part.status === 'in-stock'
       }));
       setParts(processedData);
-    } catch (error) {
+
+      const fetchedBrands = new Set<string>();
+      processedData.forEach(part => {
+        part.brand.forEach(b => fetchedBrands.add(b));
+      });
+      setAllBrands(prev => Array.from(new Set([...prev, ...Array.from(fetchedBrands)])).sort());
+    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error("Failed to fetch spare parts:", error);
-      // Removed the 'setError' state as it wasn't defined.
-      // If you want to show an error message, add a state for it.
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      alert("Failed to fetch spare parts: " + errorMessage);
     } finally {
       setLoading(false);
     }
-  }, []); // Depend on nothing if initialCategory is only used on mount
+  }, []);
 
   useEffect(() => {
     fetchParts();
     if (initialCategory) {
         setSelectedCategoryFilter(initialCategory);
     }
-  }, [fetchParts, initialCategory]); // Add initialCategory to dependencies
+  }, [fetchParts, initialCategory]);
 
   const deletePart = async (id: string) => {
     if (!confirm("Are you sure to delete this part?")) return;
@@ -116,8 +133,10 @@ export default function PublicInventoryClient() {
         const error = await res.text();
         alert("Failed to delete: " + error);
       }
-    } catch (error) {
+    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error("Error deleting part:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      alert("Error deleting part: " + errorMessage);
     } finally {
       setActionLoading(null);
     }
@@ -137,7 +156,6 @@ export default function PublicInventoryClient() {
           prev.map((p) => {
             if (p._id === id) {
               const updatedPart = { ...p, status: newStatus as "in-stock" | "out-of-stock" };
-              // Recalculate isLowStock when status changes
               return {
                 ...updatedPart,
                 isLowStock: updatedPart.quantity <= LOW_STOCK_THRESHOLD && updatedPart.status === 'in-stock'
@@ -150,44 +168,25 @@ export default function PublicInventoryClient() {
         const error = await res.text();
         alert("Failed to update status: " + error);
       }
-    } catch (error) {
+    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error("Error toggling stock:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      alert("Error toggling stock: " + errorMessage);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target;
-    setNewPart((prev) => ({
-      ...prev,
-      [name]: type === "number" ? parseFloat(value) || 0 : value,
-    }));
-  };
-
-  const handleAddModalOpen = () => {
-    setNewPart({
-      name: "",
-      deviceModel: "",
-      quantity: 0,
-      price: 0,
-      imageUrl: "",
-      description: "",
-      category: selectedCategoryFilter !== "All" ? selectedCategoryFilter : CATEGORIES[0] || "",
-    });
-    setAddModalOpen(true);
-  };
-
-  const handleAddSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddSubmit = async (data: Omit<SparePart, "_id" | "status" | "isLowStock">) => {
     setActionLoading("add");
     try {
       const res = await fetch("/api/spare-parts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newPart, status: "in-stock" }),
+        body: JSON.stringify({
+          ...data,
+          status: data.quantity > 0 ? "in-stock" : "out-of-stock",
+        }),
       });
 
       if (!res.ok) {
@@ -197,53 +196,37 @@ export default function PublicInventoryClient() {
 
       const saved: SparePart = await res.json();
       setParts((prev) => [
-        ...prev,
         {
           ...saved,
           price: parseFloat(saved.price as unknown as string) || 0,
           quantity: parseInt(saved.quantity as unknown as string) || 0,
-          isLowStock: saved.quantity <= LOW_STOCK_THRESHOLD && saved.status === 'in-stock', // Calculate here
+          deviceModel: Array.isArray(saved.deviceModel) ? saved.deviceModel : (saved.deviceModel ? [saved.deviceModel] : []),
+          brand: Array.isArray(saved.brand) ? saved.brand : (saved.brand ? [saved.brand] : []),
+          isLowStock: saved.quantity <= LOW_STOCK_THRESHOLD && saved.status === 'in-stock',
         },
+        ...prev,
       ]);
       setAddModalOpen(false);
-      setNewPart({ name: "", deviceModel: "", quantity: 0, price: 0, imageUrl: "", description: "", category: CATEGORIES[0] || "" });
-    } catch (error) {
+    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error("Error adding part:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      alert("Error adding part: " + errorMessage);
     } finally {
       setActionLoading(null);
     }
   };
 
-  const openEditModal = (part: SparePart) => {
-    setSelectedPart(part);
-    setEditModalOpen(true);
-  };
-
-  const handleEditChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value, type } = e.target;
-    setSelectedPart((prev) => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        [name]: type === "number" ? parseFloat(value) || 0 : value,
-      };
-    });
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditSubmit = async (data: Omit<SparePart, "_id" | "status" | "isLowStock">) => {
     if (!selectedPart) return;
 
     setActionLoading(selectedPart._id);
-    const { _id, isLowStock, ...cleaned } = selectedPart; // Destructure isLowStock to not send to API
+    const { _id } = selectedPart;
 
     try {
       const res = await fetch(`/api/spare-parts/${_id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cleaned),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
@@ -259,15 +242,19 @@ export default function PublicInventoryClient() {
                 ...updated,
                 price: parseFloat(updated.price as unknown as string) || 0,
                 quantity: parseInt(updated.quantity as unknown as string) || 0,
-                isLowStock: updated.quantity <= LOW_STOCK_THRESHOLD && updated.status === 'in-stock', // Recalculate
+                deviceModel: Array.isArray(updated.deviceModel) ? updated.deviceModel : (updated.deviceModel ? [updated.deviceModel] : []),
+                brand: Array.isArray(updated.brand) ? updated.brand : (updated.brand ? [updated.brand] : []),
+                isLowStock: updated.quantity <= LOW_STOCK_THRESHOLD && updated.status === 'in-stock',
               }
             : p
         )
       );
       setEditModalOpen(false);
       setSelectedPart(null);
-    } catch (error) {
+    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error("Error updating part:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      alert("Error updating part: " + errorMessage);
     } finally {
       setActionLoading(null);
     }
@@ -276,10 +263,13 @@ export default function PublicInventoryClient() {
   const filteredParts = useMemo(() => {
     let currentParts = parts.filter(
       (part) => {
+        const lowerCaseSearch = search.toLowerCase();
         const matchesSearch =
-          part?.name?.toLowerCase().includes(search.toLowerCase()) ||
-          part?.deviceModel?.toLowerCase().includes(search.toLowerCase()) ||
-          part?.description?.toLowerCase().includes(search.toLowerCase());
+          part?.description?.toLowerCase().includes(lowerCaseSearch) ||
+          part?.boxNumber?.toLowerCase().includes(lowerCaseSearch) ||
+          part.category.toLowerCase().includes(lowerCaseSearch) ||
+          part.deviceModel.some(model => model.toLowerCase().includes(lowerCaseSearch)) ||
+          part.brand.some(brandName => brandName.toLowerCase().includes(lowerCaseSearch));
 
         const matchesCategory =
           selectedCategoryFilter === "All" || part.category === selectedCategoryFilter;
@@ -291,13 +281,137 @@ export default function PublicInventoryClient() {
       }
     );
 
-    // Apply low stock filter
     if (showLowStockOnly) {
       currentParts = currentParts.filter(part => part.isLowStock);
     }
 
     return currentParts;
   }, [parts, search, selectedCategoryFilter, selectedStatusFilter, showLowStockOnly]);
+
+  const MobileSparePartListItem: React.FC<{ part: SparePart }> = ({ part }) => (
+    <div className="flex items-start p-3 border-b border-gray-100 last:border-b-0 bg-white shadow-md rounded-lg mb-3">
+        {/* Image Thumbnail */}
+        <div className="flex-shrink-0 mr-3">
+            {part.imageUrl ? (
+                // FIX: Replaced <img> with <Image>
+                <Image
+                    src={part.imageUrl}
+                    alt={part.category}
+                    width={64}
+                    height={64}
+                    className="w-16 h-16 object-cover rounded-md shadow-sm border border-gray-200"
+                />
+            ) : (
+                <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center text-gray-500 text-[0.65rem] text-center p-1 leading-tight">No Image</div>
+            )}
+        </div>
+
+        <div className="flex-grow min-w-0 flex flex-col">
+            {/* Top Row: Category (Big & Highlighted) and Status */}
+            <div className="flex items-center justify-between w-full mb-1">
+                <h3 className="font-extrabold text-base text-blue-800 break-words pr-2 leading-tight">
+                    {part.category}
+                </h3>
+                <span
+                    className={`px-2 py-0.5 rounded-full text-[0.65rem] font-semibold flex-shrink-0 ml-2 ${
+                        part.status === "in-stock"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                    }`}
+                >
+                    {part.status === "in-stock" ? "In Stock" : "Out"}
+                </span>
+            </div>
+
+            {/* Box Number */}
+            {part.boxNumber && (
+                <p className="text-sm font-semibold text-gray-700 mt-0.5 mb-1">
+                    Box No: <span className="text-blue-600 font-bold">{part.boxNumber}</span>
+                </p>
+            )}
+
+            {/* Brand(s) and Model(s) - as grouped badges */}
+            {(part.brand.length > 0 || part.deviceModel.length > 0) && (
+                <div className="flex flex-col gap-1 mb-2">
+                    {part.brand.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Brands:</span>
+                            {part.brand.map((b, index) => (
+                                <Badge key={index} className="bg-purple-100 text-purple-800 text-[0.6rem] py-0.5 px-1.5 font-medium">
+                                    {b}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+                    {part.deviceModel.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-xs font-medium text-gray-700">Models:</span>
+                            {part.deviceModel.map((model, index) => (
+                                <Badge key={index} className="bg-blue-100 text-blue-800 text-[0.6rem] py-0.5 px-1.5 font-medium">
+                                    {model}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Quantity, Price, and Low Stock + Actions Dropdown */}
+            <div className="flex items-center justify-between mt-auto pt-1 border-t border-gray-200">
+                <div className="flex items-center gap-3">
+                    <p className="text-base font-extrabold text-green-700">₹{part.price.toFixed(2)}</p>
+                    <p className={`text-sm font-semibold ${part.isLowStock ? 'text-red-700' : 'text-gray-700'}`}>
+                        Qty: {part.quantity}
+                    </p>
+                    {part.isLowStock && (
+                        <span className="text-red-500 text-[0.6rem] font-bold animate-pulse">!LOW</span>
+                    )}
+                </div>
+
+                {/* Dropdown Menu for Actions */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-gray-500 hover:text-blue-700 hover:bg-gray-100">
+                            <MoreVertical size={18} />
+                            <span className="sr-only">Actions</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-36 text-sm shadow-lg">
+                        <DropdownMenuItem
+                            onClick={() => {
+                                setSelectedPart(part);
+                                setEditModalOpen(true);
+                            }}
+                            className="cursor-pointer flex items-center gap-2 py-1.5 hover:bg-gray-50 transition-colors"
+                            disabled={actionLoading === part._id}
+                        >
+                            {actionLoading === part._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil size={14} />}
+                            Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => toggleStock(part._id, part.status)}
+                            className="cursor-pointer flex items-center gap-2 py-1.5 hover:bg-gray-50 transition-colors"
+                            disabled={actionLoading === part._id}
+                        >
+                            {actionLoading === part._id ? <Loader2 className="h-3 w-3 animate-spin" /> : (
+                                part.status === "in-stock" ? <Tag size={14} /> : <Layers size={14} />
+                            )}
+                            {part.status === "in-stock" ? "Mark Out" : "Mark In"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => deletePart(part._id)}
+                            className="cursor-pointer text-red-600 hover:text-red-700 flex items-center gap-2 py-1.5 hover:bg-red-50 transition-colors"
+                            disabled={actionLoading === part._id}
+                        >
+                            {actionLoading === part._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={14} />}
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        </div>
+    </div>
+  );
 
 
   return (
@@ -307,19 +421,19 @@ export default function PublicInventoryClient() {
           Spare Parts Inventory
         </h1>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center mb-6">
-          <div className="relative w-full sm:w-auto flex-grow">
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center mb-6 flex-wrap">
+          <div className="relative w-full sm:w-auto flex-grow-[2]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <Input
-              placeholder="Search by name, model, or description..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 w-full shadow-sm"
+              placeholder="Search by category, model(s), brand(s), description, or box number..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 w-full shadow-md" 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
           <Select value={selectedCategoryFilter} onValueChange={setSelectedCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[180px] h-auto py-2">
+            <SelectTrigger className="w-full sm:w-[180px] h-auto py-2 shadow-md">
               <SelectValue placeholder="Filter by Category" />
             </SelectTrigger>
             <SelectContent>
@@ -336,7 +450,7 @@ export default function PublicInventoryClient() {
             value={selectedStatusFilter}
             onValueChange={(value) => setSelectedStatusFilter(value as "All" | "in-stock" | "out-of-stock")}
           >
-            <SelectTrigger className="w-full sm:w-[150px] h-auto py-2">
+            <SelectTrigger className="w-full sm:w-[150px] h-auto py-2 shadow-md">
               <SelectValue placeholder="Filter by Status" />
             </SelectTrigger>
             <SelectContent>
@@ -346,7 +460,6 @@ export default function PublicInventoryClient() {
             </SelectContent>
           </Select>
 
-          {/* New checkbox for Low Stock Filter */}
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
@@ -361,7 +474,19 @@ export default function PublicInventoryClient() {
           </div>
 
           <Button
-            onClick={handleAddModalOpen}
+            onClick={() => {
+                setAddFormInitialData({
+                    deviceModel: [],
+                    brand: [],
+                    quantity: 0,
+                    price: 0,
+                    imageUrl: "",
+                    description: "",
+                    category: selectedCategoryFilter !== "All" ? selectedCategoryFilter : CATEGORIES[0],
+                    boxNumber: "",
+                });
+                setAddModalOpen(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2 shadow-md transition-all duration-200 flex items-center gap-2 group transform active:scale-95 w-full sm:w-auto"
             disabled={actionLoading === "add"}
           >
@@ -382,288 +507,194 @@ export default function PublicInventoryClient() {
         ) : filteredParts.length === 0 ? (
           <div className="text-center text-gray-500 p-10 border rounded-lg bg-white shadow-sm">
             <p className="text-lg mb-2">No spare parts found.</p>
-            {(search || selectedCategoryFilter !== "All" || selectedStatusFilter !== "All" || showLowStockOnly) && ( // Updated for low stock filter
+            {(search || selectedCategoryFilter !== "All" || selectedStatusFilter !== "All" || showLowStockOnly) && (
               <p className="text-sm">Try adjusting your search or filters.</p>
             )}
-            <Button onClick={handleAddModalOpen} className="mt-4 bg-blue-500 hover:bg-blue-600">
+            <Button onClick={() => setAddModalOpen(true)} className="mt-4 bg-blue-500 hover:bg-blue-600">
               Add the first part
             </Button>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg shadow-lg border border-gray-100 bg-white">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Image</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Model</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="p-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredParts.map((part) => (
-                  <tr key={part._id} className="border-t hover:bg-blue-50 transition-colors duration-150 ease-in-out">
-                    <td className="p-4 whitespace-nowrap">
-                      {part.imageUrl ? (
-                        <Image
-                          src={part.imageUrl}
-                          alt={part.name}
-                          width={64}
-                          height={64}
-                          className="w-16 h-16 object-cover rounded-md shadow-sm border border-gray-200"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center text-gray-500 text-xs text-center p-1">No Image</div>
-                      )}
-                    </td>
-                    <td className="p-4 whitespace-nowrap font-medium text-gray-900">{part.name}</td>
-                    <td className="p-4 whitespace-nowrap text-gray-700">{part.deviceModel}</td>
-                    <td className="p-4 whitespace-nowrap text-gray-700">{part.category}</td>
-                    <td className="p-4 whitespace-nowrap text-gray-700">
-                      {/* Conditionally apply style or add an alert indicator */}
-                      <span className={`${part.isLowStock ? 'font-bold text-red-600' : ''}`}>
-                        {part.quantity}
-                      </span>
-                      {part.isLowStock && (
-                        <span className="ml-2 text-red-500 text-xs font-semibold">
-                          (Low Stock!)
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 whitespace-nowrap text-gray-700">₹{part.price.toFixed(2)}</td>
-                    <td className="p-4 whitespace-nowrap">
-                      <span
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
-                          part.status === "in-stock"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {part.status === "in-stock" ? "In Stock" : "Out of Stock"}
-                      </span>
-                    </td>
-                    <td className="p-2 whitespace-nowrap space-x-1">
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => openEditModal(part)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto"
-                          disabled={actionLoading === part._id}
-                        >
-                          {actionLoading === part._id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Pencil size={14} />
-                          )}
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => deletePart(part._id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto"
-                          disabled={actionLoading === part._id}
-                        >
-                          {actionLoading === part._id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Trash size={14} />
-                          )}
-                          Delete
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => toggleStock(part._id, part.status)}
-                          className={`px-3 py-1.5 rounded-md text-xs sm:text-sm shadow-sm transition-all duration-200 transform active:scale-95 flex items-center justify-center gap-1 w-full sm:w-auto ${
-                            part.status === "in-stock"
-                              ? "bg-yellow-500 hover:bg-yellow-600 text-white"
-                              : "bg-green-500 hover:bg-green-600 text-white"
-                          }`}
-                          disabled={actionLoading === part._id}
-                        >
-                          {actionLoading === part._id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <RefreshCcw size={14} />
-                          )}
-                          {part.status === "in-stock" ? "Mark Out" : "Mark In"}
-                        </Button>
-                      </div>
-                    </td>
+          <>
+            {/* Desktop Table View (Hidden on extra small screens, shown on sm and up) */}
+            <div className="hidden sm:block overflow-x-auto rounded-lg shadow-lg border border-gray-100 bg-white">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Image</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider min-w-[80px]">Box No.</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Brand(s)</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Model(s)</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Price</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                    <th className="p-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredParts.map((part) => (
+                    <tr key={part._id} className="border-t hover:bg-blue-50 transition-colors duration-150 ease-in-out">
+                      <td className="p-3 whitespace-nowrap">
+                        {part.imageUrl ? (
+                          // FIX: Replaced <img> with <Image>
+                          <Image
+                            src={part.imageUrl}
+                            alt={part.category}
+                            width={56}
+                            height={56}
+                            className="w-14 h-14 object-cover rounded-md shadow-sm border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 bg-gray-200 rounded-md flex items-center justify-center text-gray-500 text-[0.6rem] text-center p-1">No Image</div>
+                        )}
+                      </td>
+                      <td className="p-3 whitespace-nowrap text-gray-800 text-sm font-semibold">{part.boxNumber || '-'}</td>
+                      <td className="p-3 whitespace-normal text-gray-700 max-w-[150px]">
+                        {part.brand && part.brand.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {part.brand.map((b, index) => (
+                              <Badge key={index} className="bg-purple-100 text-purple-800 text-xs py-0.5 px-2">
+                                {b}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 whitespace-normal text-gray-700 max-w-[180px]">
+                        {part.deviceModel && part.deviceModel.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {part.deviceModel.map((model, index) => (
+                              <Badge key={index} className="bg-blue-100 text-blue-800 text-xs py-0.5 px-2">
+                                {model}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className="p-3 whitespace-nowrap text-blue-800 text-base font-bold">{part.category}</td>
+                      <td className="p-3 whitespace-nowrap text-gray-700 text-sm">
+                        <span className={`${part.isLowStock ? 'font-bold text-red-600' : ''}`}>
+                          {part.quantity}
+                        </span>
+                        {part.isLowStock && (
+                          <span className="ml-2 text-red-500 text-xs font-semibold">
+                            (Low!)
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 whitespace-nowrap text-gray-700 text-sm font-semibold">₹{part.price.toFixed(2)}</td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            part.status === "in-stock"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {part.status === "in-stock" ? "In Stock" : "Out of Stock"}
+                        </span>
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <div className="flex gap-2">
+                          <Button
+                            size="icon"
+                            onClick={() => {
+                              setSelectedPart(part);
+                              setEditModalOpen(true);
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600 text-white w-8 h-8 rounded-md shadow-sm transition-all duration-200 transform active:scale-95"
+                            disabled={actionLoading === part._id}
+                          >
+                            {actionLoading === part._id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Pencil size={14} />
+                            )}
+                            <span className="sr-only">Edit</span>
+                          </Button>
+                          <Button
+                            size="icon"
+                            onClick={() => toggleStock(part._id, part.status)}
+                            className={`w-8 h-8 rounded-md shadow-sm transition-all duration-200 transform active:scale-95 ${
+                              part.status === "in-stock"
+                                ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                                : "bg-green-500 hover:bg-green-600 text-white"
+                            }`}
+                            disabled={actionLoading === part._id}
+                          >
+                            {actionLoading === part._id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                                part.status === "in-stock" ? <Tag size={14} /> : <Layers size={14} />
+                            )}
+                            <span className="sr-only">{part.status === "in-stock" ? "Mark Out" : "Mark In"}</span>
+                          </Button>
+                          <Button
+                            size="icon"
+                            onClick={() => deletePart(part._id)}
+                            className="bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-md shadow-sm transition-all duration-200 transform active:scale-95"
+                            disabled={actionLoading === part._id}
+                          >
+                            {actionLoading === part._id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                            <span className="sr-only">Delete</span>
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile List View (Shown on extra small screens, hidden on sm and up) */}
+            <div className="sm:hidden flex flex-col gap-2">
+              {filteredParts.map((part) => (
+                <MobileSparePartListItem key={part._id} part={part} />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Add Part Modal */}
-      <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
-        <DialogContent className="max-w-[90%] w-full sm:max-w-[425px] md:max-w-[500px] lg:max-w-[600px] p-6 rounded-lg shadow-xl mx-auto my-8 max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-blue-700">Add New Spare Part</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleAddSubmit} className="space-y-4 pt-4">
-            {/* Each div containing Label and Input/Select */}
-            <div>
-              <Label htmlFor="addName" className="text-sm font-medium text-gray-700">Name</Label>
-              <Input id="addName" name="name" required onChange={handleInputChange} value={newPart.name} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <Label htmlFor="addDeviceModel" className="text-sm font-medium text-gray-700">Model</Label>
-              <Input id="addDeviceModel" name="deviceModel" required onChange={handleInputChange} value={newPart.deviceModel} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <Label htmlFor="addCategory" className="text-sm font-medium text-gray-700">Category</Label>
-              <Select onValueChange={(value) => setNewPart(prev => ({ ...prev, category: value }))} value={newPart.category}>
-                <SelectTrigger id="addCategory" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="addQuantity" className="text-sm font-medium text-gray-700">Quantity</Label>
-              <Input id="addQuantity" name="quantity" type="number" required onChange={handleInputChange} value={newPart.quantity === 0 ? "" : newPart.quantity} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <Label htmlFor="addPrice" className="text-sm font-medium text-gray-700">Price (₹)</Label>
-              <Input id="addPrice" name="price" type="number" required onChange={handleInputChange} value={newPart.price === 0 ? "" : newPart.price} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <Label htmlFor="addImageUrl" className="text-sm font-medium text-gray-700">Image URL</Label>
-              <Input id="addImageUrl" name="imageUrl" onChange={handleInputChange} value={newPart.imageUrl} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div>
-              <Label htmlFor="addDescription" className="text-sm font-medium text-gray-700">Description</Label>
-              <Textarea id="addDescription" name="description" rows={3} onChange={handleInputChange} value={newPart.description} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500" />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 justify-end"> {/* Added flex-col for mobile */}
-              <Button type="button" variant="outline" disabled className="flex items-center gap-1 w-full sm:w-auto"> {/* Added w-full for mobile */}
-                <ImagePlus size={16} /> Upload
-              </Button>
-              <Button type="button" variant="outline" disabled className="flex items-center gap-1 w-full sm:w-auto"> {/* Added w-full for mobile */}
-                <Wand2 size={16} /> Generate Image
-              </Button>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1 w-full sm:w-auto" disabled={actionLoading === "add"}> {/* Added w-full for mobile */}
-                {actionLoading === "add" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  "Save Part"
-                )}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Add Part Modal using SparePartForm */}
+      <SparePartForm
+        isOpen={addModalOpen}
+        onOpenChange={setAddModalOpen}
+        onSubmit={handleAddSubmit}
+        isEditMode={false}
+        actionLoading={actionLoading === "add"}
+        allBrands={allBrands}
+        onAddBrandToAll={handleAddBrandToAll}
+        initialData={addFormInitialData}
+      />
 
-      {/* Edit Modal */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent className="max-w-[90%] w-full sm:max-w-[425px] md:max-w-[500px] lg:max-w-[600px] p-6 rounded-lg shadow-xl mx-auto my-8 max-h-[90vh] overflow-y-auto"> {/* Applied same DialogContent classes here */}
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-blue-700">Edit Spare Part</DialogTitle>
-          </DialogHeader>
-          {selectedPart && (
-            <form onSubmit={handleEditSubmit} className="space-y-4 pt-4">
-              <div>
-                <Label htmlFor="editName" className="text-sm font-medium text-gray-700">Name</Label>
-                <Input
-                  id="editName"
-                  name="name"
-                  value={selectedPart.name}
-                  onChange={handleEditChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editDeviceModel" className="text-sm font-medium text-gray-700">Model</Label>
-                <Input
-                  id="editDeviceModel"
-                  name="deviceModel"
-                  value={selectedPart.deviceModel}
-                  onChange={handleEditChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editCategory" className="text-sm font-medium text-gray-700">Category</Label>
-                <Select onValueChange={(value) => setSelectedPart(prev => (prev ? { ...prev, category: value } : null))} value={selectedPart.category}>
-                  <SelectTrigger id="editCategory" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="editQuantity" className="text-sm font-medium text-gray-700">Quantity</Label>
-                <Input
-                  id="editQuantity"
-                  name="quantity"
-                  type="number"
-                  value={selectedPart.quantity === 0 ? "" : selectedPart.quantity}
-                  onChange={handleEditChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editPrice" className="text-sm font-medium text-gray-700">Price</Label>
-                <Input
-                  id="editPrice"
-                  name="price"
-                  type="number"
-                  value={selectedPart.price === 0 ? "" : selectedPart.price}
-                  onChange={handleEditChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editImageUrl" className="text-sm font-medium text-gray-700">Image URL</Label>
-                <Input
-                  id="editImageUrl"
-                  name="imageUrl"
-                  value={selectedPart.imageUrl || ""}
-                  onChange={handleEditChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editDescription" className="text-sm font-medium text-gray-700">Description</Label>
-                <Textarea
-                  id="editDescription"
-                  name="description"
-                  rows={3}
-                  value={selectedPart.description || ""}
-                  onChange={handleEditChange}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 shadow-sm transition-all duration-200 transform active:scale-95 flex items-center gap-1" disabled={actionLoading === selectedPart._id}>
-                {actionLoading === selectedPart._id ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  "Update Part"
-                )}
-              </Button>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Edit Part Modal using SparePartForm */}
+      {selectedPart && (
+        <SparePartForm
+          isOpen={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          initialData={{
+             deviceModel: selectedPart.deviceModel,
+             brand: selectedPart.brand,
+             quantity: selectedPart.quantity,
+             price: selectedPart.price,
+             category: selectedPart.category,
+             imageUrl: selectedPart.imageUrl,
+             description: selectedPart.description,
+             boxNumber: selectedPart.boxNumber,
+          }}
+          onSubmit={handleEditSubmit}
+          isEditMode={true}
+          actionLoading={actionLoading === selectedPart._id}
+          allBrands={allBrands}
+          onAddBrandToAll={handleAddBrandToAll}
+        />
+      )}
     </div>
   );
 }

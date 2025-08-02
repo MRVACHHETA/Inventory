@@ -121,3 +121,41 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom CSS for printing. */
+@media print {
+  /* Class to hide any element when printing */
+  .hide-on-print {
+    display: none !important;
+  }
+
+  /* Make the bill card the only visible element */
+  .min-w-full {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 1.5rem; /* Replicate the padding of the CardContent */
+    box-shadow: none; /* Remove shadows for printing */
+    border: none; /* Remove borders for a cleaner look */
+    background-color: white; /* Ensure a white background */
+    color: black; /* Ensure text is black for readability */
+  }
+
+  /*
+    Since we cannot easily hide everything with one selector without affecting the bill,
+    we'll now use the `hide-on-print` class to target the elements to hide.
+  */
+  
+  /* Hide the sidebar */
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Hide the main content area surrounding the bill */
+  main {
+    margin: 0;
+    padding: 0;
+  }
+}
