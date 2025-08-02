@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image"; // ADDED this import for image optimization
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +25,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const CATEGORIES = [
   "Combos", "Frames", "Back Panels", "LCDs", "Batteries", "Cameras",
@@ -106,7 +115,7 @@ export default function PublicInventoryClient() {
         part.brand.forEach(b => fetchedBrands.add(b));
       });
       setAllBrands(prev => Array.from(new Set([...prev, ...Array.from(fetchedBrands)])).sort());
-    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
+    } catch (error: unknown) {
       console.error("Failed to fetch spare parts:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       alert("Failed to fetch spare parts: " + errorMessage);
@@ -133,7 +142,7 @@ export default function PublicInventoryClient() {
         const error = await res.text();
         alert("Failed to delete: " + error);
       }
-    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
+    } catch (error: unknown) {
       console.error("Error deleting part:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       alert("Error deleting part: " + errorMessage);
@@ -168,7 +177,7 @@ export default function PublicInventoryClient() {
         const error = await res.text();
         alert("Failed to update status: " + error);
       }
-    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
+    } catch (error: unknown) {
       console.error("Error toggling stock:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       alert("Error toggling stock: " + errorMessage);
@@ -207,7 +216,7 @@ export default function PublicInventoryClient() {
         ...prev,
       ]);
       setAddModalOpen(false);
-    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
+    } catch (error: unknown) {
       console.error("Error adding part:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       alert("Error adding part: " + errorMessage);
@@ -251,7 +260,7 @@ export default function PublicInventoryClient() {
       );
       setEditModalOpen(false);
       setSelectedPart(null);
-    } catch (error: unknown) { // FIX: Replaced 'any' with 'unknown' and added type guard
+    } catch (error: unknown) {
       console.error("Error updating part:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       alert("Error updating part: " + errorMessage);
@@ -293,7 +302,6 @@ export default function PublicInventoryClient() {
         {/* Image Thumbnail */}
         <div className="flex-shrink-0 mr-3">
             {part.imageUrl ? (
-                // FIX: Replaced <img> with <Image>
                 <Image
                     src={part.imageUrl}
                     alt={part.category}
@@ -356,7 +364,7 @@ export default function PublicInventoryClient() {
                 </div>
             )}
 
-            {/* Quantity, Price, and Low Stock + Actions Dropdown */}
+            {/* Quantity, Price, and Low Stock + Actions Sheet */}
             <div className="flex items-center justify-between mt-auto pt-1 border-t border-gray-200">
                 <div className="flex items-center gap-3">
                     <p className="text-base font-extrabold text-green-700">₹{part.price.toFixed(2)}</p>
@@ -368,46 +376,61 @@ export default function PublicInventoryClient() {
                     )}
                 </div>
 
-                {/* Dropdown Menu for Actions */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                <Sheet>
+                    <SheetTrigger asChild>
                         <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-gray-500 hover:text-blue-700 hover:bg-gray-100">
                             <MoreVertical size={18} />
                             <span className="sr-only">Actions</span>
                         </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36 text-sm shadow-lg">
-                        <DropdownMenuItem
-                            onClick={() => {
-                                setSelectedPart(part);
-                                setEditModalOpen(true);
-                            }}
-                            className="cursor-pointer flex items-center gap-2 py-1.5 hover:bg-gray-50 transition-colors"
-                            disabled={actionLoading === part._id}
-                        >
-                            {actionLoading === part._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil size={14} />}
-                            Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() => toggleStock(part._id, part.status)}
-                            className="cursor-pointer flex items-center gap-2 py-1.5 hover:bg-gray-50 transition-colors"
-                            disabled={actionLoading === part._id}
-                        >
-                            {actionLoading === part._id ? <Loader2 className="h-3 w-3 animate-spin" /> : (
-                                part.status === "in-stock" ? <Tag size={14} /> : <Layers size={14} />
-                            )}
-                            {part.status === "in-stock" ? "Mark Out" : "Mark In"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onClick={() => deletePart(part._id)}
-                            className="cursor-pointer text-red-600 hover:text-red-700 flex items-center gap-2 py-1.5 hover:bg-red-50 transition-colors"
-                            disabled={actionLoading === part._id}
-                        >
-                            {actionLoading === part._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={14} />}
-                            Delete
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                    </SheetTrigger>
+                    <SheetContent side="bottom" className="w-full h-auto p-4 rounded-t-lg">
+                        <SheetHeader className="mb-4">
+                            <SheetTitle>Part Actions</SheetTitle>
+                            <SheetDescription>
+                                Actions for: {part.category} ({part.deviceModel.join(', ')})
+                            </SheetDescription>
+                        </SheetHeader>
+                        <div className="grid gap-2">
+                            {/* UPDATED: Edit button with blue colors */}
+                            <Button
+                                onClick={() => {
+                                    setSelectedPart(part);
+                                    setEditModalOpen(true);
+                                }}
+                                className="bg-blue-500 hover:bg-blue-600 text-white w-full justify-start gap-2"
+                                disabled={actionLoading === part._id}
+                            >
+                                {actionLoading === part._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil size={18} />}
+                                Edit
+                            </Button>
+                            {/* UPDATED: Toggle Stock button with conditional yellow/green colors */}
+                            <Button
+                                onClick={() => toggleStock(part._id, part.status)}
+                                className={`${
+                                    part.status === "in-stock"
+                                        ? "bg-yellow-500 hover:bg-yellow-600"
+                                        : "bg-green-500 hover:bg-green-600"
+                                } text-white w-full justify-start gap-2`}
+                                disabled={actionLoading === part._id}
+                            >
+                                {actionLoading === part._id ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                                    part.status === "in-stock" ? <Tag size={18} /> : <Layers size={18} />
+                                )}
+                                {part.status === "in-stock" ? "Mark Out of Stock" : "Mark In Stock"}
+                            </Button>
+                            {/* UPDATED: Delete button with red colors */}
+                            <Button
+                                variant="destructive"
+                                onClick={() => deletePart(part._id)}
+                                className="bg-red-500 hover:bg-red-600 text-white w-full justify-start gap-2"
+                                disabled={actionLoading === part._id}
+                            >
+                                {actionLoading === part._id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 size={18} />}
+                                Delete
+                            </Button>
+                        </div>
+                    </SheetContent>
+                </Sheet>
             </div>
         </div>
     </div>
@@ -426,7 +449,7 @@ export default function PublicInventoryClient() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <Input
               placeholder="Search by category, model(s), brand(s), description, or box number..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 w-full shadow-md" 
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 w-full shadow-md"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -537,7 +560,6 @@ export default function PublicInventoryClient() {
                     <tr key={part._id} className="border-t hover:bg-blue-50 transition-colors duration-150 ease-in-out">
                       <td className="p-3 whitespace-nowrap">
                         {part.imageUrl ? (
-                          // FIX: Replaced <img> with <Image>
                           <Image
                             src={part.imageUrl}
                             alt={part.category}

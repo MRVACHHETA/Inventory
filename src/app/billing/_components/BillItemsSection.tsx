@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // CHANGED: Replaced Popover with Dialog
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { Check, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,6 @@ interface BillItemsSectionProps {
   categories: string[];
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
-  // FIX: Added 'partSearchTerm' back to the interface to fix the type error
   partSearchTerm: string;
   handlePartSearch: (term: string) => void;
   searchResultsParts: SparePart[];
@@ -37,7 +36,6 @@ const BillItemsSection: React.FC<BillItemsSectionProps> = ({
   categories,
   selectedCategory,
   setSelectedCategory,
-  // FIX: Added 'partSearchTerm' back to the destructuring
   partSearchTerm,
   handlePartSearch,
   searchResultsParts,
@@ -76,8 +74,10 @@ const BillItemsSection: React.FC<BillItemsSectionProps> = ({
 
           <div className='space-y-1 col-span-1 md:col-span-2'>
             <Label className="text-sm">Search Part</Label>
-            <Popover open={openPartSearch} onOpenChange={setOpenPartSearch}>
-              <PopoverTrigger asChild>
+            
+            {/* CHANGED: Popover replaced with Dialog */}
+            <Dialog open={openPartSearch} onOpenChange={setOpenPartSearch}>
+              <DialogTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
@@ -93,19 +93,29 @@ const BillItemsSection: React.FC<BillItemsSectionProps> = ({
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[calc(100vw-1rem)] md:w-[500px] p-0">
+              </DialogTrigger>
+              {/* UPDATED: DialogContent with mobile-friendly styles */}
+              <DialogContent className="sm:max-w-[800px] p-6 max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Search for a Spare Part</DialogTitle>
+                  <DialogDescription>
+                    Select a part from the list to add to the bill.
+                  </DialogDescription>
+                </DialogHeader>
                 <Command>
                   <CommandInput
                     placeholder="Search parts..."
                     onValueChange={(value) => handlePartSearch(value)}
                   />
                   <CommandEmpty>No parts found.</CommandEmpty>
-                  <CommandGroup heading="Spare Parts" className="max-h-60 overflow-y-auto">
+                  <CommandGroup heading="Spare Parts">
                     {searchResultsParts.map((p) => (
                       <CommandItem
                         key={p._id}
-                        onSelect={() => handleSelectPartToAdd(p._id)}
+                        onSelect={() => {
+                            handleSelectPartToAdd(p._id);
+                            setOpenPartSearch(false); // Close the dialog on select
+                        }}
                         value={`${p.category} ${p.deviceModel.join(' ')} ${p.brand.join(' ')} ${p.boxNumber || ''}`}
                         className="text-sm"
                       >
@@ -126,8 +136,9 @@ const BillItemsSection: React.FC<BillItemsSectionProps> = ({
                     ))}
                   </CommandGroup>
                 </Command>
-              </PopoverContent>
-            </Popover>
+              </DialogContent>
+            </Dialog>
+
             {selectedPartToAdd && (
               <div className="mt-1 p-2 border rounded-md bg-green-50 dark:bg-green-900/20 text-xs">
                 Selected: {selectedPartToAdd.category} ({selectedPartToAdd.deviceModel.join(', ')}) - Stock: {selectedPartToAdd.quantity} - Price: ₹{selectedPartToAdd.price} {selectedPartToAdd.boxNumber && `(Box: ${selectedPartToAdd.boxNumber})`}
