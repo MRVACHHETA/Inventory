@@ -47,12 +47,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Existing GET handler for searching customers
+// GET handler for searching customers
 export async function GET(request: NextRequest) {
   try {
     await connectMongoDB();
     const { searchParams } = new URL(request.url);
     const searchTerm = searchParams.get('search') || '';
+
+    // ADDED: Log the search term to the console to verify
+    console.log(`Searching for customers with term: '${searchTerm}'`);
 
     let customers;
     if (searchTerm) {
@@ -65,6 +68,9 @@ export async function GET(request: NextRequest) {
     } else {
       customers = await Customer.find().sort({ createdAt: -1 }).limit(20);
     }
+
+    // ADDED: Log the search results to the console
+    console.log(`Found ${customers.length} customers.`);
 
     return NextResponse.json(customers);
   } catch (error) { // FIX: Remove ': any' and handle error type-safely

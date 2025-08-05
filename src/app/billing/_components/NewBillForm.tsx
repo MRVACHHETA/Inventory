@@ -39,7 +39,10 @@ const NewBillForm: React.FC = () => {
 
     // Payment and Finalization state and handlers
     discountAmount, setDiscountAmount, notes, setNotes, totalNewBillAmount, totalDue,
-    paymentMode, handlePaymentModeChange, payments, newPayment, setNewPayment, totalPaid,
+    paymentMode, handlePaymentModeChange, payments, newPayment, setNewPayment,
+    // FIX: Destructured the new payment source state and handler
+    newPaymentSource, handleNewPaymentSourceChange,
+    totalPaid,
     remainingToPay, isSubmitting, handleSubmitBill, handleAddPayment, handleUpdatePaymentSource,
     handleRemovePayment,
 
@@ -101,13 +104,16 @@ const NewBillForm: React.FC = () => {
           notes={notes}
           setNotes={setNotes}
           totalNewBillAmount={totalNewBillAmount}
-          totalPendingAmount={totalPendingAmount} // Corrected line: added the missing prop
+          totalPendingAmount={totalPendingAmount}
           totalDue={totalDue}
           paymentMode={paymentMode}
           handlePaymentModeChange={handlePaymentModeChange}
           payments={payments}
           newPayment={newPayment}
           setNewPayment={setNewPayment}
+          // FIX: Passed the new props down to PaymentSection
+          newPaymentSource={newPaymentSource}
+          handleNewPaymentSourceChange={handleNewPaymentSourceChange}
           totalPaid={totalPaid}
           remainingToPay={remainingToPay}
           isSubmitting={isSubmitting}

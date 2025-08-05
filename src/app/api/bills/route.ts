@@ -1,11 +1,11 @@
+// src/app/api/bills/route.ts
+
 import { NextResponse, NextRequest } from 'next/server';
 import connectMongoDB from '@/lib/mongodb';
 import Bill from '@/models/Bill';
 import SparePart from '@/models/SparePart';
-// FIX: Removed 'FilterQuery' from the import, as we are no longer using it for the variable
 import mongoose, { Schema } from 'mongoose';
-import { Payment, BillItemFormData } from '@/app/billing/_components/types';
-
+import { Payment, BillItemFormData, PaidBillHistoryItem } from '@/app/billing/_components/types';
 
 // Ensure the Counter model is defined and accessible
 const counterSchema = new Schema({
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Missing required bill data.");
     }
     
+    // Get new bill ID
     const counterDoc = await Counter.findByIdAndUpdate(
       { _id: 'billId' },
       { $inc: { seq: 1 } },
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
     );
     const newBillId = counterDoc.seq.toString(); 
 
+    // Update spare part quantities
     for (const billItem of items) {
       const sparePart = await SparePart.findById(billItem.sparePart).session(session);
       if (!sparePart) {
@@ -56,40 +58,46 @@ export async function POST(request: NextRequest) {
       await sparePart.save({ session });
     }
 
-    let totalPaymentForTransaction = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
-    const paidBillsHistory = [];
+    const paidBillsHistory: PaidBillHistoryItem[] = [];
+    const totalPaymentForTransaction = payments.reduce((sum: number, p: Payment) => sum + p.amount, 0);
+    let amountUsedForOldBills = 0;
+    
+    let remainingPayment = totalPaymentForTransaction;
 
+    // Find and sort pending bills to clear
     const pendingBills = await Bill.find({
       _id: { $in: pendingBillsToClear },
       pendingAmount: { $gt: 0 }
     }).sort({ createdAt: 1 }).session(session);
 
+    // Apply payments to old bills
     for (const pendingBill of pendingBills) {
-      if (totalPaymentForTransaction <= 0) break;
+      if (remainingPayment <= 0) break;
 
-      const amountToClear = Math.min(pendingBill.pendingAmount, totalPaymentForTransaction);
+      const amountToClear = Math.min(pendingBill.pendingAmount, remainingPayment);
+      
       pendingBill.amountPaid += amountToClear;
       pendingBill.pendingAmount -= amountToClear;
       
       if (!pendingBill.payments) {
           pendingBill.payments = [];
       }
+      
+      pendingBill.paymentStatus = pendingBill.pendingAmount <= 0.01 ? 'Fully Paid' : 'Partially Paid';
       if (pendingBill.pendingAmount <= 0.01) {
-        pendingBill.pendingAmount = 0;
-        pendingBill.paymentStatus = 'Fully Paid';
-      } else {
-        pendingBill.paymentStatus = 'Partially Paid';
+          pendingBill.pendingAmount = 0;
       }
       
       pendingBill.payments.push({
           amount: amountToClear,
-          source: 'From New Bill',
+          source: 'Pending Bill Payment',
           date: new Date(),
-          transactionId: newBillId,
+          sourceBillIds: [newBillId],
       });
 
       await pendingBill.save({ session });
-      totalPaymentForTransaction -= amountToClear;
+      remainingPayment -= amountToClear;
+      amountUsedForOldBills += amountToClear;
 
       paidBillsHistory.push({
         billId: pendingBill.billId,
@@ -100,32 +108,44 @@ export async function POST(request: NextRequest) {
 
     const totalAmountBeforeDiscount = items.reduce((sum: number, item: BillItemFormData) => sum + item.quantity * item.unitPrice, 0);
     const finalTotal = totalAmountBeforeDiscount - discountAmount;
-    const newBillAmountPaid = Math.max(0, totalPaymentForTransaction);
-    const newBillPendingAmount = Math.max(0, finalTotal - newBillAmountPaid);
+    
+    const newBillPaymentAmount = totalPaymentForTransaction - amountUsedForOldBills;
+    const newBillPendingAmount = Math.max(0, finalTotal - newBillPaymentAmount);
     
     let newBillPaymentStatus;
     if (newBillPendingAmount <= 0.01) {
         newBillPaymentStatus = 'Fully Paid';
-    } else if (newBillAmountPaid > 0) {
+    } else if (newBillPaymentAmount > 0) {
         newBillPaymentStatus = 'Partially Paid';
     } else {
         newBillPaymentStatus = 'Unpaid';
     }
+
+    // FIX START: This section has been refactored to correctly populate the payments array for the new bill
+    const newBillPayments = [];
+    let amountToAssignToNewBill = newBillPaymentAmount;
+
+    for (const p of payments) {
+      if (amountToAssignToNewBill <= 0) break;
+      const amountForThisEntry = Math.min(p.amount, amountToAssignToNewBill);
+
+      newBillPayments.push({
+        amount: amountForThisEntry,
+        source: p.source,
+        date: new Date(),
+      });
+      amountToAssignToNewBill -= amountForThisEntry;
+    }
+    // FIX END
     
-    const newBillPayments = payments.filter((p: Payment) => p.amount > 0);
-    const billPaymentsWithMeta = newBillPayments.map((p: Payment) => ({
-      amount: p.amount,
-      source: p.source,
-      date: new Date(),
-    }));
-    
-    if (totalPaymentForTransaction > 0 && payments.length === 0) {
-        billPaymentsWithMeta.push({
-            amount: totalPaymentForTransaction,
-            source: 'Pending Bill Payment',
-            date: new Date(),
-            sourceBillIds: paidBillsHistory.map(h => h.billId)
-        });
+    // Add a separate entry for the payments made to old bills
+    if (amountUsedForOldBills > 0 && paidBillsHistory.length > 0) {
+      newBillPayments.push({
+        amount: amountUsedForOldBills,
+        source: 'Payment for Previous Bills',
+        date: new Date(),
+        sourceBillIds: paidBillsHistory.map(h => h.billId),
+      });
     }
     
     const newBill = await Bill.create([{
@@ -136,10 +156,10 @@ export async function POST(request: NextRequest) {
       items,
       totalAmount: finalTotal,
       discountAmount,
-      amountPaid: newBillAmountPaid,
+      amountPaid: newBillPaymentAmount,
       pendingAmount: newBillPendingAmount,
       paymentStatus: newBillPaymentStatus,
-      payments: billPaymentsWithMeta,
+      payments: newBillPayments,
       notes,
     }], { session });
 
@@ -185,8 +205,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const skip = (page - 1) * limit;
 
-    // FIX: Removed the explicit 'FilterQuery<any>[]' type annotation.
-    // Let TypeScript infer the type, which is cleaner and satisfies the linter.
     const conditions = [];
     
     if (customerId) {
@@ -224,7 +242,7 @@ export async function GET(request: NextRequest) {
     if (getPendingBills && customerId) {
       const pendingBills = await Bill.find({ customer: customerId, pendingAmount: { $gt: 0 } })
                                      .sort({ createdAt: 1 })
-                                     .select('billId totalAmount amountPaid pendingAmount createdAt items payments')
+                                     .select('billId totalAmount amountPaid pendingAmount createdAt items payments.sourceBillIds payments.source payments.amount payments.date')
                                      .populate('items.sparePart', 'category deviceModel brand boxNumber')
                                      .exec();
       return NextResponse.json(pendingBills);

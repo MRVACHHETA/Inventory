@@ -7,12 +7,27 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Menu, ReceiptText } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Toaster } from "@/components/ui/sonner"; // Your Toaster component from sonner
+import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
+
+import { useTranslation } from "react-i18next";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import "../i18n"; // Import the i18n configuration
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Use the translation hook
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language;
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -36,11 +51,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     localStorage.removeItem("userGender");
     window.location.href = "/";
   };
+  
+  // Function to change the language
+  const changeLanguage = (lang: string) => {
+    i18n.changeLanguage(lang);
+    // You might want to save the selected language to localStorage for persistence
+    localStorage.setItem('i18nextLng', lang);
+  };
 
   return (
-    <html lang="en">
+    <html lang={currentLang}>
       <head>
-        <title>Inventory System</title>
+        <title>{t('app.title')}</title>
         <meta name="description" content="Manage your inventory seamlessly" />
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
@@ -52,22 +74,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="max-w-7xl mx-auto flex items-center justify-between px-4 py-3">
             <Link href="/" className="flex items-center gap-3">
               <Image src="/inventory-logo.png" alt="Inventory Logo" width={60} height={60} className="rounded-xl" />
-              <span className="text-xl sm:text-2xl font-bold text-blue-700 tracking-tight whitespace-nowrap">Inventory System</span>
+              <span className="text-xl sm:text-2xl font-bold text-blue-700 tracking-tight whitespace-nowrap">{t('app.title')}</span>
             </Link>
 
             <nav className="hidden sm:flex items-center gap-4 text-sm font-medium text-gray-700">
-              <Link href="/" className="hover:text-blue-600">Home</Link>
+              <Link href="/" className="hover:text-blue-600">{t('nav.home')}</Link>
 
-              {/* CORRECTED: Billing Button for desktop navigation */}
               <Button asChild variant="default" size="sm" className="ml-2 px-4">
                 <Link href="/billing">
-                  {/* Wrap content in a single div */}
                   <div className="flex items-center gap-2">
                     <ReceiptText className="h-4 w-4" />
-                    <span>Billing</span>
+                    <span>{t('nav.billing')}</span>
                   </div>
                 </Link>
               </Button>
+
+              <Select onValueChange={changeLanguage} value={currentLang}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">{t('language.english')}</SelectItem>
+                  <SelectItem value="hi">{t('language.hindi')}</SelectItem>
+                  <SelectItem value="gu">{t('language.gujarati')}</SelectItem>
+                </SelectContent>
+              </Select>
+              
 
               {!loading && (
                 userName ? (
@@ -76,8 +108,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <div className="w-7 h-7 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs">👤</div>
                       <span className="max-w-[120px] truncate">{userName}</span>
                     </Link>
-                    <Link href="/admin/dashboard" className="text-xs ml-2 px-2 py-1 rounded-full hover:bg-blue-100 text-blue-600">Dashboard</Link>
-                    <button onClick={handleLogout} className="text-xs px-2 py-1 ml-2 rounded-full text-red-500 hover:bg-red-50">Logout</button>
+                    <Link href="/admin/dashboard" className="text-xs ml-2 px-2 py-1 rounded-full hover:bg-blue-100 text-blue-600">{t('nav.dashboard')}</Link>
+                    <button onClick={handleLogout} className="text-xs px-2 py-1 ml-2 rounded-full text-red-500 hover:bg-red-50">{t('nav.logout')}</button>
                   </div>
                 ) : (
                   null
@@ -94,17 +126,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </SheetTrigger>
                 <SheetContent side="right" className="w-64 bg-white text-gray-900 border-l shadow-xl">
                   <div className="mt-14 flex flex-col gap-4 px-4">
-                    <Link href="/" className="py-2 border-b hover:text-blue-600">Home</Link>
-                    {/* CORRECTED: Billing Button for mobile navigation */}
+                    <Link href="/" className="py-2 border-b hover:text-blue-600">{t('nav.home')}</Link>
                     <Button asChild variant="default" className="justify-start px-0 py-2 w-full text-base">
                         <Link href="/billing">
-                            {/* Wrap content in a single div */}
                             <div className="flex items-center gap-2 ml-4">
                                 <ReceiptText className="h-5 w-5" />
-                                <span>Billing</span>
+                                <span>{t('nav.billing')}</span>
                             </div>
                         </Link>
                     </Button>
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-gray-700 font-medium">Language</span>
+                      <Select onValueChange={changeLanguage} value={currentLang}>
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue placeholder="Language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en">{t('language.english')}</SelectItem>
+                          <SelectItem value="hi">{t('language.hindi')}</SelectItem>
+                          <SelectItem value="gu">{t('language.gujarati')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
                     {!loading && (
                       userName ? (
@@ -113,8 +156,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                             <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-800 flex items-center justify-center text-xs">👤</div>
                             <span>{userName}</span>
                           </Link>
-                          <Link href="/admin/dashboard" className="text-sm text-blue-600 hover:underline">Dashboard</Link>
-                          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">Logout</button>
+                          <Link href="/admin/dashboard" className="text-sm text-blue-600 hover:underline">{t('nav.dashboard')}</Link>
+                          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">{t('nav.logout')}</button>
                         </div>
                       ) : (
                         null
@@ -130,24 +173,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="min-h-screen pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {children}
         </main>
-        {/* UPDATED TOASTER COMPONENT */}
         <Toaster
-          position="bottom-right" // Position of the toast (e.g., "bottom-right", "top-center")
-          richColors             // Use a richer color palette for success/error toasts
-          duration={5000}        // Duration in milliseconds (5000ms = 5 seconds). Adjust as needed.
-          closeButton            // Adds a small 'x' button to close the toast manually
-          theme="light"          // Explicitly set theme to 'light' (or 'dark', or 'system').
-                                 // If 'light' is still unclear, try 'dark'.
-          toastOptions={{       // Custom styling for the toasts themselves
+          position="bottom-right"
+          richColors
+          duration={5000}
+          closeButton
+          theme="light"
+          toastOptions={{
             style: {
-              background: 'white', // Ensure a solid white background
-              color: 'black',      // Ensure black text color for contrast
-              border: '1px solid #e2e8f0', // Add a subtle border
-              padding: '12px 16px', // Adjust padding for more space
-              minHeight: '48px',   // Ensure minimum height to prevent text cutoff
+              background: 'white',
+              color: 'black',
+              border: '1px solid #e2e8f0',
+              padding: '12px 16px',
+              minHeight: '48px',
             },
-            // You can add className here for Tailwind classes if needed
-            // className: 'text-sm font-medium',
           }}
         />
       </body>

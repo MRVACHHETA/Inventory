@@ -8,13 +8,13 @@ export interface CustomerFormData {
 }
 
 // All possible payment sources
-export type PaymentSource = 'Cash' | 'UPI' | 'Card' | 'From New Bill' | 'Pending Bill Payment' | '';
+export type PaymentSource = 'Cash' | 'UPI' | 'Card' | 'Payment for Previous Bills' | 'pending_bill_payment';
 
 // Interface for a single payment object
 export interface Payment {
   amount: number;
   source: PaymentSource;
-  date: string;
+  date: Date;
   // Added optional sourceBillIds to the Payment interface
   sourceBillIds?: string[];
 }
@@ -30,10 +30,14 @@ export interface SparePart {
   price: number;
 }
 
-export interface PendingBillItem {
-  _id: string;
+export interface BillItem {
+  _id?: string;
   // SparePart can now be null, matching the component logic
   sparePart: SparePart | null;
+  name?: string;
+  deviceModel: string[];
+  brand: string[];
+  boxNumber?: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;
@@ -47,7 +51,7 @@ export interface PendingBill {
   totalAmount: number;
   amountPaid: number;
   pendingAmount: number;
-  items: PendingBillItem[];
+  items: BillItem[];
   payments: Payment[];
 }
 
@@ -86,17 +90,6 @@ export interface PaidBillHistoryItem {
   billId: string;
   amountCleared: number;
   newPendingAmount: number;
-}
-
-// Interface for a complete bill item, used for display
-export interface BillItem {
-  name: string;
-  deviceModel: string[];
-  brand: string[];
-  boxNumber?: string;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
 }
 
 // Interface for the final bill summary status

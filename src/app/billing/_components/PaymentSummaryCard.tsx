@@ -1,3 +1,4 @@
+// src/app/billing/_components/PaymentSummaryCard.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,34 +20,40 @@ const PaymentSummaryCard: React.FC<PaymentSummaryCardProps> = ({
   paidBillsHistory,
   handleClearCustomer,
 }) => {
+  const isOverpaid = finalNewBillStatus.pendingAmount < 0;
+  const isFullyPaid = finalNewBillStatus.pendingAmount === 0;
+  const isPartiallyPaid = finalNewBillStatus.pendingAmount > 0;
+
   return (
-    // Updated border and removed fixed green color for a more neutral style
     <Card className="border-l-4 border-green-500">
-      {/* Visual Header with Icon for better UX */}
       <CardHeader className="bg-green-50 dark:bg-green-950 p-4 md:p-6 flex flex-row items-center space-x-2">
         <CheckCircle className="h-6 w-6 text-green-600" />
         <CardTitle className="text-green-600 dark:text-green-400 text-xl">Bill Finalized Successfully!</CardTitle>
       </CardHeader>
       <CardContent className="p-4 md:p-6">
         <div className="space-y-4">
-          {/* FIX: Escaped the apostrophe in "Today's" */}
           <h4 className="text-lg font-bold">Today&apos;s Bill:</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <p><span className="font-semibold text-sm">Bill ID:</span> {finalNewBillStatus.billId}</p>
             <p><span className="font-semibold text-sm">Status:</span> <span className="font-semibold">{finalNewBillStatus.paymentStatus}</span></p>
           </div>
           
-          {finalNewBillStatus.pendingAmount > 0 && (
+          {/* FIX: Updated display logic to handle negative, zero, and positive pending amounts */}
+          {isPartiallyPaid && (
               <p className="text-red-500 font-bold">Remaining Due: ₹{finalNewBillStatus.pendingAmount.toFixed(2)}</p>
           )}
-          {finalNewBillStatus.pendingAmount <= 0 && (
-              <p className="text-green-500 font-bold">Paid in full!</p>
+          {isFullyPaid && (
+              <p className="text-green-500 font-bold">This bill is fully paid!</p>
+          )}
+          {isOverpaid && (
+              <p className="text-blue-500 font-bold">Overpaid: ₹{Math.abs(finalNewBillStatus.pendingAmount).toFixed(2)}</p>
           )}
 
           {paidBillsHistory.length > 0 && (
               <>
                   <Separator className="my-4" />
-                  <h4 className="text-lg font-bold">Pending Payments Cleared:</h4>
+                  {/* FIX: Improved heading to be more descriptive */}
+                  <h4 className="text-lg font-bold">Payments Applied to Previous Bills:</h4>
                   <div className="space-y-2">
                       {paidBillsHistory.map((history, index) => (
                           <div key={index} className="border p-3 rounded-md bg-gray-50 dark:bg-gray-800">

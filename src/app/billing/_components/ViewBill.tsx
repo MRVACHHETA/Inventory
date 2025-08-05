@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import AddPaymentModal from './AddPaymentModal';
-// FIX: Removed the unused 'BillItem' from the import
 import { Bill, Payment } from './types';
 
 interface ViewBillProps {
@@ -38,7 +37,6 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
   const [error, setError] = useState<string | null>(null);
   const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
 
-  // FIX: Wrapped fetchBill in useCallback to memoize it
   const fetchBill = useCallback(async () => {
     if (!billId) return;
 
@@ -58,7 +56,6 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
         description: `Details for bill ${data.billId} have been fetched successfully.`,
       });
     } catch (err: unknown) {
-      // FIX: Replaced 'any' with 'unknown' and added a type guard
       console.error('Error fetching bill:', err);
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(errorMessage);
@@ -68,9 +65,8 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [billId]); // useCallback dependency
+  }, [billId]);
 
-  // FIX: Added fetchBill to the useEffect dependency array
   useEffect(() => {
     fetchBill();
   }, [billId, fetchBill]);
@@ -101,47 +97,35 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
 
   const normalizedStatus = formatStatus(bill.paymentStatus);
 
-  // FIX: Removed the unused 'platform' parameter
   const generateShareMessage = (): string => {
-    // Shared content for both platforms
     let message = `*--- Sai Chetna Mobiles ---*\n\n`;
     message += `*Invoice ID:* ${bill.billId}\n`;
     message += `*Date:* ${format(new Date(bill.createdAt), 'dd MMMM, yyyy h:mm a')}\n\n`;
     message += `*Customer:* ${bill.customerName}\n`;
     message += `*Phone:* ${bill.customerPhone}\n\n`;
     
-    // Add item details
     message += `*--- Items on Bill ---*\n`;
-    // FIX: Removed the unused 'index' parameter
     bill.items.forEach((item) => {
         message += `• ${item.name} (${item.deviceModel.join(', ')}) - Qty: ${item.quantity}\n`;
         message += `   Price: ₹${item.unitPrice.toFixed(2)} x ${item.quantity} = ₹${item.subtotal.toFixed(2)}\n`;
     });
     message += `\n`;
 
-    // Add detailed payment timeline
     message += `*--- Payment Timeline ---*\n`;
     let runningPendingAmount = bill.totalAmount;
     message += `*Initial Bill Amount:* ₹${bill.totalAmount.toFixed(2)}\n`;
     bill.payments.forEach((payment) => {
-      runningPendingAmount -= payment.amount;
-      
-      let paymentSourceDescription: string;
-      if (payment.source === 'Pending Bill Payment' && payment.sourceBillIds && payment.sourceBillIds.length > 0) {
-        paymentSourceDescription = `from bill(s) ${payment.sourceBillIds.join(', ')}`;
-      } else if (payment.source === 'Pending Bill Payment') {
-        paymentSourceDescription = `from another pending bill`;
+      if (payment.source !== 'Payment for Previous Bills') {
+          runningPendingAmount -= payment.amount;
+          message += `   - *Paid:* ₹${payment.amount.toFixed(2)} via ${payment.source}\n`;
+          message += `     *Remaining:* ₹${runningPendingAmount.toFixed(2)}\n`;
       } else {
-        paymentSourceDescription = `via ${payment.source}`;
+        message += `   - *Paid:* ₹${payment.amount.toFixed(2)} for previous bill(s): ${payment.sourceBillIds?.join(', ')}\n`;
       }
-
-      message += `   - *Paid:* ₹${payment.amount.toFixed(2)} (${paymentSourceDescription})\n`;
-      message += `     *Remaining:* ₹${runningPendingAmount.toFixed(2)}\n`;
       message += `     *Date:* ${format(new Date(payment.date), 'dd MMM, yyyy h:mm a')}\n`;
     });
     message += `\n`;
     
-    // Add financial summary
     message += `*--- Final Summary ---*\n`;
     message += `*Subtotal:* ₹${(bill.totalAmount + bill.discountAmount).toFixed(2)}\n`;
     if (bill.discountAmount > 0) {
@@ -157,13 +141,10 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
 
     message += `*Thank you for your purchase. We hope to see you again soon!*`;
     
-    // URL-encode the message for sharing
     return encodeURIComponent(message);
   };
 
   const generatePrintableHtml = (billData: Bill): string => {
-    // Generate the HTML content for the bill to be printed
-    // FIX: Removed the unused 'index' parameter
     const itemsHtml = billData.items.map((item) => `
       <tr class="border-b">
         <td class="py-2 px-4 font-medium">${item.name}<br><span class="text-xs text-gray-500">${item.deviceModel.join(', ')}</span></td>
@@ -176,10 +157,8 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
 
     const paymentsHtml = billData.payments.map((payment) => {
       let paymentSourceDescription: string;
-      if (payment.source === 'Pending Bill Payment' && payment.sourceBillIds && payment.sourceBillIds.length > 0) {
-        paymentSourceDescription = `from bill(s) ${payment.sourceBillIds.join(', ')}`;
-      } else if (payment.source === 'Pending Bill Payment') {
-        paymentSourceDescription = `from another pending bill`;
+      if (payment.source === 'Payment for Previous Bills' && payment.sourceBillIds && payment.sourceBillIds.length > 0) {
+        paymentSourceDescription = `for old bill(s): ${payment.sourceBillIds.join(', ')}`;
       } else {
         paymentSourceDescription = `via ${payment.source}`;
       }
@@ -348,34 +327,35 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
       });
 
       bill.payments.forEach((payment) => {
-          runningPendingAmount -= payment.amount;
-          
-          let description;
-          if (payment.source === 'Pending Bill Payment') {
-            description = (
-              <>
-                <span className="flex items-center">
-                    <ArrowRightCircle className="h-4 w-4 mr-2 text-green-500" />
-                    Payment from another bill
-                </span>
-                <span className="ml-6 text-xs font-semibold text-muted-foreground">
-                    {payment.sourceBillIds && payment.sourceBillIds.length > 0
-                        ? `(from bill(s): ${payment.sourceBillIds.join(', ')})`
-                        : '(from another pending bill)'}
-                </span>
-              </>
-            );
-          } else {
-            description = `Payment via ${payment.source}`;
-          }
+        let amountToSubtract = 0;
+        let description: string | ReactNode;
 
-          timeline.push({
-              description: description,
-              amount: payment.amount,
-              date: payment.date,
-              runningBalance: runningPendingAmount,
-              sourceBillIds: payment.sourceBillIds,
-          });
+        if (payment.source === 'Payment for Previous Bills') {
+          // Do not subtract from current bill's running balance
+          amountToSubtract = 0; 
+          description = (
+            <>
+              <span className="flex items-center">
+                  <ArrowRightCircle className="h-4 w-4 mr-2 text-green-500" />
+                  Payment for Previous Bills
+              </span>
+            </>
+          );
+        } else {
+          // Subtract a payment made for the current bill
+          amountToSubtract = payment.amount;
+          description = `Payment via ${payment.source}`;
+        }
+          
+        runningPendingAmount -= amountToSubtract;
+
+        timeline.push({
+            description: description,
+            amount: payment.amount,
+            date: new Date(payment.date).toISOString(),
+            runningBalance: runningPendingAmount,
+            sourceBillIds: payment.sourceBillIds,
+        });
       });
 
       return timeline;
@@ -475,7 +455,7 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
                 <div className="absolute left-2.5 top-0 bottom-0 w-0.5 bg-muted-foreground/30" />
                 {timelineData.map((event, index) => {
                     const isInitial = index === 0;
-                    const payment = isInitial ? undefined : bill.payments[index - 1];
+                    const isPaymentForOtherBills = event.sourceBillIds && event.sourceBillIds.length > 0;
                     
                     return (
                         <div key={index} className="relative flex items-start gap-4 mb-6">
@@ -483,14 +463,33 @@ const ViewBill: React.FC<ViewBillProps> = ({ billId }) => {
                                 <IndianRupee className="h-3 w-3" />
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-medium">{event.description}</p>
+                                <p className="text-sm font-medium">
+                                  {isPaymentForOtherBills ? (
+                                    <>
+                                      <span className="flex items-center">
+                                        <ArrowRightCircle className="h-4 w-4 mr-2 text-green-500" />
+                                        Payment for Previous Bills
+                                      </span>
+                                      <span className="ml-6 text-xs font-semibold text-muted-foreground">(from bill(s): {event.sourceBillIds?.join(', ')})</span>
+                                    </>
+                                  ) : (
+                                    event.description
+                                  )}
+                                </p>
                                 <p className="text-xs text-muted-foreground">
                                     {format(new Date(event.date), 'dd MMM, yyyy h:mm a')}
                                 </p>
                                 {!isInitial && (
                                     <div className="flex justify-between mt-1 text-sm">
-                                        <span className="text-sm">Paid: <span className="font-bold text-green-500">₹{payment?.amount.toFixed(2)}</span></span>
-                                        <span className="text-sm">Remaining: <span className="font-bold text-red-500">₹{event.runningBalance.toFixed(2)}</span></span>
+                                        <span className="text-sm">
+                                          Paid: <span className="font-bold text-green-500">₹{event.amount.toFixed(2)}</span>
+                                        </span>
+                                        {/* FIX: Only show remaining if it's not a payment for other bills */}
+                                        {!isPaymentForOtherBills && (
+                                          <span className="text-sm">
+                                            Remaining: <span className="font-bold text-red-500">₹{event.runningBalance.toFixed(2)}</span>
+                                          </span>
+                                        )}
                                     </div>
                                 )}
                             </div>

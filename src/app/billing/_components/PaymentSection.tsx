@@ -1,3 +1,4 @@
+// src/app/billing/_components/PaymentSection.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -17,7 +18,6 @@ interface PaymentSectionProps {
   notes: string;
   setNotes: (notes: string) => void;
   totalNewBillAmount: number;
-  // FIX: Added 'totalPendingAmount' back to the interface to fix the type error
   totalPendingAmount: number;
   totalDue: number;
   paymentMode: PaymentMode;
@@ -25,6 +25,9 @@ interface PaymentSectionProps {
   payments: Payment[];
   newPayment: Payment;
   setNewPayment: (payment: Payment) => void;
+  // FIX: Added new props for the new payment source state and handler
+  newPaymentSource: Payment['source'];
+  handleNewPaymentSourceChange: (source: Payment['source']) => void;
   totalPaid: number;
   remainingToPay: number;
   isSubmitting: boolean;
@@ -40,7 +43,6 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   notes,
   setNotes,
   totalNewBillAmount,
-  // FIX: Added 'totalPendingAmount' back to the destructuring
   totalPendingAmount,
   totalDue,
   paymentMode,
@@ -48,6 +50,9 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
   payments,
   newPayment,
   setNewPayment,
+  // FIX: Added new props to the destructuring
+  newPaymentSource,
+  handleNewPaymentSourceChange,
   totalPaid,
   remainingToPay,
   isSubmitting,
@@ -128,9 +133,10 @@ const PaymentSection: React.FC<PaymentSectionProps> = ({
                 </div>
                 <div className="col-span-1 space-y-1">
                   <Label htmlFor="newPaymentSource">Payment Source</Label>
+                  {/* FIX: Use the newPaymentSource state and handler */}
                   <Select
-                    value={newPayment.source}
-                    onValueChange={(value: Payment['source']) => setNewPayment({ ...newPayment, source: value })}
+                    value={newPaymentSource}
+                    onValueChange={(value: Payment['source']) => handleNewPaymentSourceChange(value)}
                   >
                     <SelectTrigger id="newPaymentSource">
                       <SelectValue placeholder="Select source" />

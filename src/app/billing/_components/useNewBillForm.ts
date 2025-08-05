@@ -1,6 +1,5 @@
 // File: src/app/billing/_components/useNewBillForm.ts
 
-// FIX: Removed 'useCallback' as it was not being used
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
@@ -50,7 +49,10 @@ const useNewBillForm = () => {
   const [billsToClear, setBillsToClear] = useState<string[]>([]);
 
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [newPayment, setNewPayment] = useState<Payment>({ amount: 0, source: '', date: new Date().toISOString() });
+  // FIX: Initialized 'date' with a new Date() object, not a string
+  const [newPayment, setNewPayment] = useState<Payment>({ amount: 0, source: 'Cash', date: new Date() });
+  const [newPaymentSource, setNewPaymentSource] = useState<Payment['source']>('Cash');
+
 
   // Derived state calculations
   const subtotalItems = billItems.reduce((sum, item) => sum + item.subtotal, 0);
@@ -64,11 +66,10 @@ const useNewBillForm = () => {
     const fetchCategories = async () => {
       try {
         const res = await fetch('/api/spare-parts');
-        const data: SparePart[] = await res.json(); // FIXED: Added type annotation to 'data'
-        const uniqueCategories = Array.from(new Set(data.map((part) => part.category))); // FIXED: Removed 'any'
+        const data: SparePart[] = await res.json();
+        const uniqueCategories = Array.from(new Set(data.map((part) => part.category)));
         setCategories(uniqueCategories as string[]);
       } catch (error: unknown) {
-        // FIX: Replaced 'any' with 'unknown' and added type guard
         console.error('Failed to fetch categories:', error);
         const errorMessage = error instanceof Error ? error.message : 'Could not load part categories.';
         toast.error('Error fetching categories', { description: errorMessage });
@@ -91,7 +92,6 @@ const useNewBillForm = () => {
         const data = await res.json();
         setSearchResultsCustomers(data);
       } catch (error: unknown) {
-        // FIX: Replaced 'any' with 'unknown' and added type guard
         console.error('Failed to search customers:', error);
         const errorMessage = error instanceof Error ? error.message : 'Could not fetch customer suggestions.';
         toast.error('Error searching customers', {
@@ -117,7 +117,6 @@ const useNewBillForm = () => {
         setPendingBills(data);
         setBillsToClear(data.map((bill: PendingBill) => bill._id));
       } catch (error: unknown) {
-        // FIX: Replaced 'any' with 'unknown' and added type guard
         console.error('Failed to fetch pending bills:', error);
         const errorMessage = error instanceof Error ? error.message : 'Could not retrieve pending payment information.';
         toast.error('Error fetching pending bills', {
@@ -135,7 +134,9 @@ const useNewBillForm = () => {
     setPendingBills([]);
     setBillsToClear([]);
     setPayments([]);
-    setNewPayment({ amount: 0, source: '', date: new Date().toISOString() });
+    // FIX: Initialized 'date' with a new Date() object, not a string
+    setNewPayment({ amount: 0, source: 'Cash', date: new Date() });
+    setNewPaymentSource('Cash');
     setPaymentMode('partially_paid');
     setShowPaymentSummary(false);
     setFinalNewBillStatus({ billId: '', pendingAmount: 0, paymentStatus: '' });
@@ -173,13 +174,11 @@ const useNewBillForm = () => {
 
       const updatedCustomer = await res.json();
       setCustomer(updatedCustomer);
-      // FIX: Escaped the apostrophe in the toast description
       toast.success('Customer Updated', {
         description: `${updatedCustomer.name}'s details have been saved.`,
       });
       setIsEditCustomerModalOpen(false);
     } catch (error: unknown) {
-      // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error('Error updating customer:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to update customer.';
       toast.error('Update Failed', {
@@ -210,7 +209,6 @@ const useNewBillForm = () => {
       });
       handleClearCustomer();
     } catch (error: unknown) {
-      // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error('Error deleting customer:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete customer.';
       toast.error('Deletion Failed', {
@@ -231,7 +229,6 @@ const useNewBillForm = () => {
         const data = await res.json();
         setSearchResultsParts(data);
       } catch (error: unknown) {
-        // FIX: Replaced 'any' with 'unknown' and added type guard
         console.error('Failed to search parts:', error);
         const errorMessage = error instanceof Error ? error.message : 'Could not fetch part suggestions.';
         toast.error('Error searching parts', {
@@ -311,16 +308,25 @@ const useNewBillForm = () => {
     setBillsToClear((prev) => (prev.includes(billId) ? prev.filter((id) => id !== billId) : [...prev, billId]));
   };
 
+  // FIX: New handler to update the source of the new payment
+  const handleNewPaymentSourceChange = (source: Payment['source']) => {
+    setNewPaymentSource(source);
+  };
+
   const handleAddPayment = () => {
-    if (newPayment.amount > 0 && newPayment.source) {
+    // FIX: Use the newPaymentSource state
+    if (newPayment.amount > 0 && newPaymentSource) {
       if (totalPaid + newPayment.amount > totalDue + 0.01) {
         toast.error('Payment Exceeds Total Due', {
           description: 'The total paid amount cannot exceed the total due amount.',
         });
         return;
       }
-      setPayments([...payments, newPayment]);
-      setNewPayment({ amount: 0, source: '', date: new Date().toISOString() });
+      // FIX: Add the newPayment with the correct source
+      setPayments([...payments, { ...newPayment, source: newPaymentSource }]);
+      // FIX: Initialized 'date' with a new Date() object, not a string
+      setNewPayment({ amount: 0, source: 'Cash', date: new Date() });
+      setNewPaymentSource('Cash');
     } else {
       toast.error('Payment Incomplete', {
         description: 'Please enter an amount and select a payment source.',
@@ -341,7 +347,9 @@ const useNewBillForm = () => {
   const handlePaymentModeChange = (mode: PaymentMode) => {
     setPaymentMode(mode);
     setPayments([]);
-    setNewPayment({ amount: 0, source: '', date: new Date().toISOString() });
+    // FIX: Initialized 'date' with a new Date() object, not a string
+    setNewPayment({ amount: 0, source: 'Cash', date: new Date() });
+    setNewPaymentSource('Cash');
 
     if (mode === 'fully_paid') {
       setBillsToClear(pendingBills.map((b) => b._id));
@@ -373,7 +381,6 @@ const useNewBillForm = () => {
         finalCustomerId = customerData._id;
         createdNewCustomer = true;
       } catch (error: unknown) {
-        // FIX: Replaced 'any' with 'unknown' and added type guard
         console.error('Error creating new customer:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to create new customer.';
         toast.error('Customer Creation Failed', {
@@ -474,14 +481,15 @@ const useNewBillForm = () => {
       setDiscountAmount(0);
       setNotes('');
       setPayments([]);
-      setNewPayment({ amount: 0, source: '', date: new Date().toISOString() });
+      // FIX: Initialized 'date' with a new Date() object, not a string
+      setNewPayment({ amount: 0, source: 'Cash', date: new Date() });
+      setNewPaymentSource('Cash');
       setSelectedPartToAdd(null);
       setPartSearchTerm('');
       setPendingBills([]);
       setBillsToClear([]);
       setPaymentMode('partially_paid');
     } catch (error: unknown) {
-      // FIX: Replaced 'any' with 'unknown' and added type guard
       console.error('Error creating bill:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to create bill.';
       toast.error('Bill Creation Failed', {
@@ -524,7 +532,7 @@ const useNewBillForm = () => {
     setOpenPartSearch,
     categories,
     selectedCategory,
-    handleSelectCategory, // Use the new handler here
+    handleSelectCategory,
     handlePartSearch,
     handleSelectPartToAdd,
     handleAddItem,
@@ -550,6 +558,9 @@ const useNewBillForm = () => {
     payments,
     newPayment,
     setNewPayment,
+    // FIX: Exposed the new state and handler
+    newPaymentSource,
+    handleNewPaymentSourceChange,
     totalPaid,
     remainingToPay,
     isSubmitting,

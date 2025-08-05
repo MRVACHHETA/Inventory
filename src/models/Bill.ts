@@ -16,9 +16,12 @@ const billItemSchema = new Schema({
 // Define the schema for a single payment
 const paymentSchema = new Schema({
     amount: { type: Number, required: true },
-    source: { type: String, enum: ['Cash', 'UPI', 'From New Bill', 'Pending Bill Payment'], required: true },
+    source: {
+        type: String,
+        enum: ['Cash', 'UPI', 'From New Bill', 'Pending Bill Payment', 'Payment for Previous Bills'], // <-- FIX: Added new enum value
+        required: true
+    },
     date: { type: Date, default: Date.now },
-    // FIX: Added new field to store the bill IDs that this payment came from
     sourceBillIds: [{ type: String }],
 });
 
@@ -44,9 +47,8 @@ export interface IBill extends Document {
   paymentStatus: 'Fully Paid' | 'Partially Paid' | 'Unpaid';
   payments: Array<{
     amount: number;
-    source: 'Cash' | 'UPI' | 'From New Bill' | 'Pending Bill Payment';
+    source: 'Cash' | 'UPI' | 'From New Bill' | 'Pending Bill Payment' | 'Payment for Previous Bills'; // <-- FIX: Added new enum value
     date: Date;
-    // FIX: Updated TypeScript interface to match the new schema
     sourceBillIds?: string[];
   }>;
   notes?: string;
