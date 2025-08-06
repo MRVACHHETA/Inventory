@@ -66,7 +66,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="description" content="Manage your inventory seamlessly" />
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" href="/icons/icon-192x192.png" />
+        {/* Updated icon links to use only icon.png */}
+        <link rel="icon" href="/icon.png" type="image/png" />
         <meta name="theme-color" content="#ffffff" />
       </head>
       <body className="antialiased bg-white text-gray-900 font-satoshi">
