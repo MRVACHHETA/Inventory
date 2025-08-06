@@ -90,17 +90,17 @@
       "LCD Belts": "LCD Belts",
       "Main Belts": "Main Belts",
       "Ringer Boxes": "Ringer Boxes",
-      "OCA Glass": "OCA Glass",
+      "OCA Glass": "Outer Glass for LCD",
       "Speakers": "Speakers",
-      "Mics": "Mics",
-      "Finger Sensors": "Finger Sensors",
-      "Camera Glass": "Camera Glass",
-      "Mix Screws": "Mix Screws",
-      "Antenna Cables": "Antenna Cables",
-      "Speaker Jalis": "Speaker Jalis",
-      "On/Off Switches": "On/Off Switches",
-      "Outer Keys": "Outer Keys",
-      "Touch Glass": "Touch Glass",
+      "Mics": "Microphone Components",
+      "Finger Sensors": "Fingerprint Scanners",
+      "Camera Glass": "Camera Lens Cover",
+      "Mix Screws": "Assorted Screws",
+      "Antenna Cables": "Network Antenna",
+      "Speaker Jalis": "Speaker Grilles",
+      "On/Off Switches": "Power Switches",
+      "Outer Keys": "Physical Buttons",
+      "Touch Glass": "Digitizer Glass",
       "Full Body": "Full Body"
     },
     "form": {
@@ -129,5 +129,15 @@
     "english": "English",
     "hindi": "हिंदी",
     "gujarati": "ગુજરાતી"
+  },
+  "login": {
+    "subtitle_extended": "Your dedication powers our growth. Log in to start your day!",
+    "email": "Email Address",
+    "password": "Password",
+    "login": "Login",
+    "logging_in": "Logging In...",
+    "success": "Login successful!",
+    "invalid_credentials": "Invalid email or password.",
+    "error": "An error occurred during login. Please try again."
   }
 }

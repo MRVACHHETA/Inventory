@@ -1,10 +1,12 @@
 // src/app/layout.tsx
+
 "use client";
 
 import "./globals.css";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { useRouter, usePathname } from 'next/navigation';
 import { Menu, ReceiptText } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
@@ -19,45 +21,67 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import "../i18n"; // Import the i18n configuration
+import "../i18n";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
 
-  // Use the translation hook
   const { t, i18n } = useTranslation();
   const currentLang = i18n.language;
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-    try {
-      if (storedUser) {
+    if (storedUser) {
+      try {
         const parsedUser = JSON.parse(storedUser);
         setUserName(parsedUser.name || parsedUser.email || null);
-      } else {
-        setUserName(localStorage.getItem("userName"));
+        // If a user is logged in and on the login page, redirect them away
+        if (pathname === '/login') {
+          router.push('/'); // Changed to redirect to the homepage
+        }
+      } catch {
+        // If parsing fails, remove bad data and redirect to login
+        localStorage.removeItem("user");
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
       }
-    } catch {
-      setUserName(localStorage.getItem("userName"));
-    } finally {
-      setLoading(false);
+    } else {
+      // If no user is logged in, redirect them to the login page
+      if (pathname !== '/login') {
+        router.push('/login');
+      }
     }
-  }, []);
+    setLoading(false);
+  }, [router, pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("userName");
     localStorage.removeItem("userGender");
-    window.location.href = "/";
+    router.push("/login"); // Redirect to login page on logout
   };
   
-  // Function to change the language
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
-    // You might want to save the selected language to localStorage for persistence
     localStorage.setItem('i18nextLng', lang);
   };
+
+  const isLoginPage = pathname === '/login';
+
+  if (loading || (isLoginPage && !localStorage.getItem("user"))) {
+    return (
+      <html lang={currentLang}>
+        <body>
+          {children}
+          <Toaster position="bottom-right" richColors duration={5000} closeButton theme="light" />
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang={currentLang}>
@@ -66,7 +90,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="description" content="Manage your inventory seamlessly" />
         <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
-        {/* Updated icon links to use only icon.png */}
         <link rel="icon" href="/icon.png" type="image/png" />
         <meta name="theme-color" content="#ffffff" />
       </head>
@@ -80,7 +103,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             <nav className="hidden sm:flex items-center gap-4 text-sm font-medium text-gray-700">
               <Link href="/" className="hover:text-blue-600">{t('nav.home')}</Link>
-
               <Button asChild variant="default" size="sm" className="ml-2 px-4">
                 <Link href="/billing">
                   <div className="flex items-center gap-2">
@@ -89,7 +111,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </div>
                 </Link>
               </Button>
-
               <Select onValueChange={changeLanguage} value={currentLang}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Language" />
@@ -100,22 +121,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <SelectItem value="gu">{t('language.gujarati')}</SelectItem>
                 </SelectContent>
               </Select>
-              
-
-              {!loading && (
-                userName ? (
-                  <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-full shadow text-blue-700 font-semibold">
-                    <Link href="/admin/dashboard" className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs">👤</div>
-                      <span className="max-w-[120px] truncate">{userName}</span>
-                    </Link>
-                    <Link href="/admin/dashboard" className="text-xs ml-2 px-2 py-1 rounded-full hover:bg-blue-100 text-blue-600">{t('nav.dashboard')}</Link>
-                    <button onClick={handleLogout} className="text-xs px-2 py-1 ml-2 rounded-full text-red-500 hover:bg-red-50">{t('nav.logout')}</button>
+              {userName ? (
+                <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-full shadow text-blue-700 font-semibold">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-xs">👤</div>
+                    <span className="max-w-[120px] truncate">{userName}</span>
                   </div>
-                ) : (
-                  null
-                )
-              )}
+                  <button onClick={handleLogout} className="text-xs px-2 py-1 ml-2 rounded-full text-red-500 hover:bg-red-50">{t('nav.logout')}</button>
+                </div>
+              ) : null}
             </nav>
 
             <div className="sm:hidden">
@@ -149,21 +163,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {!loading && (
-                      userName ? (
-                        <div className="flex flex-col gap-2 mt-4 bg-gray-100 p-3 rounded-lg">
-                          <Link href="/admin/dashboard" className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-800 flex items-center justify-center text-xs">👤</div>
-                            <span>{userName}</span>
-                          </Link>
-                          <Link href="/admin/dashboard" className="text-sm text-blue-600 hover:underline">{t('nav.dashboard')}</Link>
-                          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">{t('nav.logout')}</button>
+                    {userName ? (
+                      <div className="flex flex-col gap-2 mt-4 bg-gray-100 p-3 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-800 flex items-center justify-center text-xs">👤</div>
+                          <span>{userName}</span>
                         </div>
-                      ) : (
-                        null
-                      )
-                    )}
+                        <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">{t('nav.logout')}</button>
+                      </div>
+                    ) : null}
                   </div>
                 </SheetContent>
               </Sheet>
@@ -171,7 +179,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        <main className="min-h-screen pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <main className={`min-h-screen pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`}>
           {children}
         </main>
         <Toaster
